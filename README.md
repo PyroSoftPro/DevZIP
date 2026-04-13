@@ -25,7 +25,23 @@ The current answer is promising:
 - Experimental backend lanes still produce readable `.dvz` archives and can be compared without changing the container format.
 - The current shipping lane is the stable "final form." The experimental ones are still in the gravity chamber.
 
-## Benchmark Snapshot
+## Top Victories
+
+If the goal is to show where DevZIP looks strongest today, these are the headline wins of the current shipping lane against the project's main size baseline, `7z-lzma2`.
+
+| Category | DevZIP (MB) | `7z-lzma2` (MB) | Win |
+| --- | ---: | ---: | ---: |
+| Text and structured data | 0.513 | 0.762 | -32.67% |
+| Raw bitmaps | 59.244 | 77.786 | -23.84% |
+| Mixed-large aggregate | 143.815 | 144.841 | -0.71% |
+| JPEG photographs | 79.842 | 81.095 | -1.54% |
+| PNG lossless images | 15.870 | 16.021 | -0.95% |
+| Video (raw YUV) | 1.854 | 1.871 | -0.94% |
+| Random / high-entropy | 10.486 | 10.487 | -0.01% |
+
+Those are the strongest current wins. The only category still not clearly ahead in the shipping lane is software binaries, where DevZIP is near-tied at `+0.32%`; the experimental `selective-zpaq5` lane is currently the strongest measured code-heavy follow-up.
+
+## Full Aggregate Comparison
 
 Latest shipping-lane aggregate result from `mixed-large`:
 
@@ -44,6 +60,7 @@ Notes:
 - Lower end size is better.
 - The `7z-deflate` lane is omitted here because the latest aggregate run was partial, not a clean apples-to-apples result.
 - Weissman scoring is still tracked internally, but DevZIP is gated primarily on end size.
+- The table above is the full aggregate view. The section above it is the curated "greatest hits" version.
 - The goal is smaller archives, not yelling until the compression ratio goes over 9000.
 
 ## Per-Type Highlights
