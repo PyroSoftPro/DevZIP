@@ -2,6 +2,8 @@
 
 DevZIP is a Windows-first archival project built around a native C++ engine and a readable `.dvz` container format.
 
+Yes, `.dvz` is one letter away from `DBZ`, so a few power-level jokes were inevitable.
+
 The project is focused on size-first compression for mixed real-world datasets. The current engine combines deterministic archive metadata, transform preprocessing, solid packing, deduplication, and pluggable native compression backends so the archive format can evolve without becoming unreadable.
 
 ## Status
@@ -21,6 +23,7 @@ The current answer is promising:
 - The shipping native lane beats `7z-lzma2` on the latest `mixed-large` aggregate rerun.
 - The archive remains self-describing by stamping the backend identity into the manifest.
 - Experimental backend lanes still produce readable `.dvz` archives and can be compared without changing the container format.
+- The current shipping lane is the stable "final form." The experimental ones are still in the gravity chamber.
 
 ## Benchmark Snapshot
 
@@ -41,6 +44,7 @@ Notes:
 - Lower end size is better.
 - The `7z-deflate` lane is omitted here because the latest aggregate run was partial, not a clean apples-to-apples result.
 - Weissman scoring is still tracked internally, but DevZIP is gated primarily on end size.
+- The goal is smaller archives, not yelling until the compression ratio goes over 9000.
 
 ## Per-Type Highlights
 
@@ -70,8 +74,8 @@ All rows below are native-only backend variants. They all produce readable `.dvz
 Current takeaway:
 
 - `best-of-three-ppmd` does not help the large text corpus in this pipeline, but it does help code-heavy data a little.
-- `selective-zpaq5` is the strongest measured code-heavy candidate so far.
-- `mixed-large` still needs a full rerun before the shipping default should change.
+- `selective-zpaq5` is the strongest measured code-heavy candidate so far. On `large-code`, it currently has the highest scouter reading.
+- `mixed-large` still needs a full rerun before the shipping default should change, so this is not the Super Saiyan switchover yet.
 
 ## What Ships Today
 
