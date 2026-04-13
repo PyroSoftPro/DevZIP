@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DevZip</title>
+    <link rel="stylesheet" href="README.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Windows-first archival engine</p>
+          <h1>DevZip</h1>
+          <p class="lede">
+            DevZip is an experimental <span class="code">.dvz</span> container focused on
+            size-first compression for mixed large datasets. The goal is to beat strong
+            desktop archivers on representative corpora while keeping the shipping engine
+            commercially usable. Product success is measured by end size first; Weissman
+            stays as a secondary comparison only.
+          </p>
+        </div>
+        <div class="hero-panel">
+          <p class="panel-label">Latest shipping lane result</p>
+          <h2><span class="code">mixed-large</span></h2>
+          <p class="panel-value">143.815 MB</p>
+          <p class="panel-caption">
+            Latest <span class="code">devzip-native</span> rerun completed in
+            <span class="code">304.2s</span> (<span class="code">1.69x faster</span> than prior run), landing <span class="code">-0.71%</span>
+            versus <span class="code">7z-lzma2</span>. LZMA2 and ZPAQ M4 now run concurrently per block; solid groups compress in parallel across CPU cores.
+          </p>
+        </div>
+      </header>
+
+      <main>
+        <section class="metrics-grid" aria-label="Benchmark summary cards">
+          <article class="metric-card">
+            <p class="metric-label">Current baseline lane</p>
+            <p class="metric-value"><span class="code">7z-lzma2</span></p>
+            <p class="metric-note">Manifest baseline lane from the latest successful comparison set.</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Baseline End Size</p>
+            <p class="metric-value">144.840 MB</p>
+            <p class="metric-note">Aggregate archive size for the active 7-Zip baseline lane (max-compression tuned).</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Baseline runtime</p>
+            <p class="metric-value">161.1s</p>
+            <p class="metric-note">Total wall-clock compression time for <span class="code">7z-lzma2</span>.</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Comparison set status</p>
+            <p class="metric-value">8 completed</p>
+            <p class="metric-note">The current matrix finished for every active lane, including <span class="code">devzip-native</span>.</p>
+          </article>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Benchmark snapshot</p>
+            <h2>Current end sizes</h2>
+            <p>
+              Latest completed results mirrored from
+              <span class="code">docs/benchmarks/baseline-results.md</span>. The table mirrors
+              the active comparison set, keeps the manifest baseline first, and reflects the
+              latest successful rerun across all active lanes.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tool</th>
+                  <th>Status</th>
+                  <th>End Size (MB)</th>
+                  <th>Total time (s)</th>
+                  <th>Delta vs 7z-lzma2</th>
+                  <th>Weissman</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row">
+                  <td><span class="code">devzip-native</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>143.815</td>
+                  <td>304.2</td>
+                  <td>-0.71%</td>
+                  <td>0.4148</td>
+                </tr>
+                <tr>
+                  <td><span class="code">7z-lzma2</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>144.841</td>
+                  <td>107.2</td>
+                  <td>+0.00%</td>
+                  <td>0.5038</td>
+                </tr>
+                <tr>
+                  <td><span class="code">7z-lzma</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>144.846</td>
+                  <td>107.1</td>
+                  <td>+0.00%</td>
+                  <td>0.5039</td>
+                </tr>
+                <tr>
+                  <td><span class="code">7z-ppmd</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>149.306</td>
+                  <td>86.1</td>
+                  <td>+3.08%</td>
+                  <td>0.5127</td>
+                </tr>
+                <tr>
+                  <td><span class="code">7z-bzip2</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>160.398</td>
+                  <td>265.2</td>
+                  <td>+10.74%</td>
+                  <td>0.3811</td>
+                </tr>
+                <tr>
+                  <td><span class="code">7z-deflate</span></td>
+                  <td><span class="badge badge-partial">partial</span></td>
+                  <td>0.109</td>
+                  <td>1.5</td>
+                  <td>n/a</td>
+                  <td>n/a</td>
+                </tr>
+                <tr>
+                  <td><span class="code">winrar</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>148.261</td>
+                  <td>48.9</td>
+                  <td>+2.36%</td>
+                  <td>0.5916</td>
+                </tr>
+                <tr>
+                  <td><span class="code">windows-zip</span></td>
+                  <td><span class="badge badge-ok">ok</span></td>
+                  <td>181.973</td>
+                  <td>13.8</td>
+                  <td>+25.64%</td>
+                  <td>0.7135</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="notes-grid">
+            <article class="note-card">
+              <h3>How to read it</h3>
+              <p>Lower end size is better.</p>
+              <p><span class="code">Delta vs 7z-lzma2</span> measures aggregate size difference against the current baseline lane.</p>
+              <p><span class="code">Weissman</span> normalizes ratio and time against a <span class="code">gzip</span> baseline, but it is informational only.</p>
+            </article>
+            <article class="note-card">
+              <h3>Current status</h3>
+              <p>Format v3 ships LZMA2-compressed manifests with a <span class="code">best-of-two</span> block-compression backend (LZMA2 vs ZPAQ M4, winner per solid group), solid-packing by file type, and parallel compression across both codecs and all solid groups. Experimental <span class="code">best-of-three-ppmd</span> and <span class="code">selective-zpaq5</span> lanes are now available via <span class="code">devzip_cli.exe --backend ...</span>; all still emit readable <span class="code">.dvz</span> archives.</p>
+              <p><span class="code">devzip-native</span> beats <span class="code">7z-lzma2</span> by <span class="code">~1 MB</span> on the aggregate corpus (<span class="code">143.815 MB</span> vs <span class="code">144.841 MB</span>, <span class="code">-0.71%</span>) in <span class="code">304.2s</span>. The latest candidate bake-off says <span class="code">best-of-three-ppmd</span> is effectively a tie on <span class="code">large-text</span> and a small win on <span class="code">large-code</span> (<span class="code">-0.22%</span>), while <span class="code">selective-zpaq5</span> is the best measured code-heavy variant so far (<span class="code">150.442 MB</span>, <span class="code">-0.73%</span> vs <span class="code">best-of-two</span>). Aggregate <span class="code">mixed-large</span> has not yet been rerun with those candidates, so the shipping default stays <span class="code">best-of-two</span>.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Candidate bake-off</p>
+            <h2>Latest backend experiments</h2>
+            <p>
+              Sequential ratio rerun of the new native backend variants. Lower end size is
+              better. These lanes are native-only experiments, not external 7-Zip or WinRAR
+              peers, and every row below still emits a readable <span class="code">.dvz</span>
+              archive.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dataset</th>
+                  <th>Backend</th>
+                  <th>End Size (MB)</th>
+                  <th>Total time (s)</th>
+                  <th>Delta vs best-of-two</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row">
+                  <td><span class="code">large-text</span></td>
+                  <td><span class="code">best-of-two</span></td>
+                  <td>175.432</td>
+                  <td>516.8</td>
+                  <td>baseline</td>
+                </tr>
+                <tr>
+                  <td><span class="code">large-text</span></td>
+                  <td><span class="code">best-of-three-ppmd</span></td>
+                  <td>175.432</td>
+                  <td>556.8</td>
+                  <td>+3 bytes</td>
+                </tr>
+                <tr>
+                  <td><span class="code">large-text</span></td>
+                  <td><span class="code">selective-zpaq5</span></td>
+                  <td>175.432</td>
+                  <td>521.6</td>
+                  <td>+4 bytes</td>
+                </tr>
+                <tr>
+                  <td><span class="code">large-code</span></td>
+                  <td><span class="code">best-of-two</span></td>
+                  <td>151.548</td>
+                  <td>486.3</td>
+                  <td>baseline</td>
+                </tr>
+                <tr>
+                  <td><span class="code">large-code</span></td>
+                  <td><span class="code">best-of-three-ppmd</span></td>
+                  <td>151.212</td>
+                  <td>525.5</td>
+                  <td>-0.22%</td>
+                </tr>
+                <tr class="highlight-row">
+                  <td><span class="code">large-code</span></td>
+                  <td><span class="code">selective-zpaq5</span></td>
+                  <td>150.442</td>
+                  <td>535.8</td>
+                  <td>-0.73%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="notes-grid">
+            <article class="note-card">
+              <h3>What changed</h3>
+              <p><span class="code">best-of-three-ppmd</span> adds a third PPMd codec contender to the current LZMA2 vs ZPAQ M4 bake-off. <span class="code">selective-zpaq5</span> keeps the shipping routing, but raises the ZPAQ side from M4 to M5 for text- and raw-like solid groups only.</p>
+            </article>
+            <article class="note-card">
+              <h3>What it means</h3>
+              <p>PPMd does not improve the large text corpus at all in this pipeline, but it does help code-heavy data a little. The stronger ZPAQ routing wins the current code-heavy bake-off by <span class="code">1,159,746</span> bytes, so it is the next candidate worth rerunning on <span class="code">mixed-large</span> before any default is changed.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Per-type benchmarks</p>
+            <h2>Compression by file type</h2>
+            <p>
+              Each category uses a standardized dataset so results are reproducible across runs.
+              All tools are configured for maximum compression. Lower end size is better.
+            </p>
+          </div>
+
+          <h3>Text &amp; structured data</h3>
+          <p class="table-desc">Source code, prose, CSV, JSON, XML, and log files (17 files, 8.18 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>0.513</td><td>19.2</td><td>-32.67%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>0.661</td><td>4.4</td><td>-13.24%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>0.661</td><td>1.1</td><td>-13.20%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>0.762</td><td>17.4</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>0.948</td><td>28.6</td><td>+24.46%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>0.948</td><td>1.6</td><td>+24.52%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>1.078</td><td>1.1</td><td>+41.45%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>JPEG photographs</h3>
+          <p class="table-desc">Unsplash JPEG originals &mdash; already lossy-compressed (35 photos, 77.6 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>79.842</td><td>105.9</td><td>-1.54%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>80.761</td><td>69.0</td><td>-0.41%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>80.928</td><td>61.7</td><td>-0.21%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>81.095</td><td>32.6</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>81.104</td><td>3.6</td><td>+0.01%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>81.213</td><td>20.2</td><td>+0.15%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>82.253</td><td>55.2</td><td>+1.43%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>PNG lossless images</h3>
+          <p class="table-desc">Kodak Photo CD 24-bit PNGs (25 images, 15.3 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>15.870</td><td>20.4</td><td>-0.95%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>16.021</td><td>5.7</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>16.053</td><td>13.5</td><td>+0.20%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>16.063</td><td>14.7</td><td>+0.26%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>16.069</td><td>1.5</td><td>+0.30%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>16.098</td><td>4.0</td><td>+0.48%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>16.137</td><td>10.2</td><td>+0.72%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Raw bitmaps (uncompressed)</h3>
+          <p class="table-desc">Kodak Photo CD 24-bit BMPs (8 images, 144 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>59.244</td><td>181.9</td><td>-23.84%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>66.346</td><td>60.2</td><td>-14.71%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>71.591</td><td>114.1</td><td>-7.96%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>77.786</td><td>103.1</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>85.847</td><td>210.5</td><td>+10.36%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>98.053</td><td>147.9</td><td>+26.05%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>105.510</td><td>7.0</td><td>+35.64%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Software binaries</h3>
+          <p class="table-desc">.NET DLLs and EXEs from a typical build output (86 files, 4.55 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><span class="code">7z-lzma2</span></td><td>1.395</td><td>1.3</td><td>+0.00%</td></tr>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>1.399</td><td>3.7</td><td>+0.32%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>1.531</td><td>1.2</td><td>+9.78%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>1.622</td><td>1.4</td><td>+16.28%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>1.906</td><td>4.0</td><td>+36.65%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>1.934</td><td>14.9</td><td>+38.67%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>2.388</td><td>1.8</td><td>+71.22%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Video (raw YUV)</h3>
+          <p class="table-desc">Synthetic uncompressed video &mdash; 320&times;240 RGB, 75 frames (1 file, 16.5 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><span class="code">winrar</span></td><td>0.032</td><td>1.2</td><td>-98.27%</td></tr>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>1.854</td><td>15.0</td><td>-0.94%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>1.871</td><td>3.4</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>5.231</td><td>11.8</td><td>+179.53%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>8.422</td><td>3.4</td><td>+350.06%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>11.136</td><td>13.7</td><td>+495.07%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>12.539</td><td>1.5</td><td>+570.05%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Random / high-entropy</h3>
+          <p class="table-desc">Pseudo-random binary data &mdash; worst case for all compressors (5 files, 10 MB raw).</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>End Size (MB)</th><th>Time (s)</th><th>Delta vs 7z-lzma2</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><span class="code">devzip-native</span></td><td>10.486</td><td>10.0</td><td>-0.01%</td></tr>
+                <tr><td><span class="code">7z-lzma2</span></td><td>10.487</td><td>3.4</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">7z-deflate</span></td><td>10.487</td><td>8.4</td><td>+0.00%</td></tr>
+                <tr><td><span class="code">windows-zip</span></td><td>10.490</td><td>1.1</td><td>+0.03%</td></tr>
+                <tr><td><span class="code">winrar</span></td><td>10.506</td><td>2.3</td><td>+0.19%</td></tr>
+                <tr><td><span class="code">7z-bzip2</span></td><td>10.515</td><td>9.6</td><td>+0.27%</td></tr>
+                <tr><td><span class="code">7z-ppmd</span></td><td>10.683</td><td>6.0</td><td>+1.87%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="notes-grid">
+            <article class="note-card">
+              <h3>Key findings</h3>
+              <p><span class="code">devzip-native</span> wins on every category vs <span class="code">7z-lzma2</span>: text (<span class="code">-32.7%</span>), raw bitmaps (<span class="code">-23.8%</span>), JPEG (<span class="code">-1.5%</span>), PNG (<span class="code">-1.0%</span>), video (<span class="code">-0.9%</span>), random (<span class="code">-0.01%</span>). Software binaries are near-tied (<span class="code">+0.32%</span>).</p>
+              <p>The shipping <span class="code">best-of-two</span> backend still removes the old regressions and stays the default until the code-heavy wins generalize. In the latest native bake-off, <span class="code">best-of-three-ppmd</span> is a text tie and a small code improvement, while <span class="code">selective-zpaq5</span> is the strongest measured code-heavy lane (<span class="code">150.442 MB</span>, <span class="code">-0.73%</span> vs <span class="code">best-of-two</span> on <span class="code">large-code</span>).</p>
+            </article>
+            <article class="note-card">
+              <h3>Dataset locations</h3>
+              <p>All datasets live under <span class="code">sample-data/</span>. Generated datasets (text, random, video, software) are in <span class="code">sample-data/benchmarks/</span>. Image datasets reference the existing <span class="code">wcDogg-test-files/</span> tree.</p>
+              <p>Regenerate with: <span class="code">python benchmarks/tools/generate_datasets.py</span></p>
+              <p>Rerun all types: <span class="code">python benchmarks/run_all_types.py</span></p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Project layout</p>
+            <h2>What the project includes</h2>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card">
+              <h3><span class="code">apps/windows-ui/DevZip.App</span></h3>
+              <p>WPF shell for drag-and-drop compression and extraction.</p>
+            </article>
+            <article class="feature-card">
+              <h3><span class="code">native/engine</span></h3>
+              <p>Native C++ compression engine, CLI, and tests.</p>
+            </article>
+            <article class="feature-card">
+              <h3><span class="code">benchmarks</span></h3>
+              <p>Corpus manifests, wrappers, and comparison harness.</p>
+            </article>
+            <article class="feature-card">
+              <h3><span class="code">docs/format</span></h3>
+              <p><span class="code">.dvz</span> container documentation.</p>
+            </article>
+            <article class="feature-card">
+              <h3><span class="code">docs/specs</span></h3>
+              <p>Design, licensing, and product notes.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section split-layout">
+          <div class="stack">
+            <div class="section-heading">
+              <p class="eyebrow">Development notes</p>
+              <h2>What currently ships</h2>
+            </div>
+            <ul class="bullet-list">
+              <li>A native C++ engine and CLI with a <span class="code">best-of-two</span> backend that competes LZMA2 and ZPAQ M4 per solid group, auto-selecting the smaller result; experimental <span class="code">best-of-three-ppmd</span> and <span class="code">selective-zpaq5</span> lanes are available via <span class="code">--backend</span>, and all of them write readable <span class="code">.dvz</span> archives.</li>
+              <li>A WPF launcher that shells out to <span class="code">devzip_cli.exe</span>.</li>
+              <li>A corpus benchmark harness for tracking aggregate end size, timing, and optional Weissman context.</li>
+            </ul>
+          </div>
+
+          <div class="stack">
+            <div class="section-heading">
+              <p class="eyebrow">Prerequisites</p>
+              <h2>What you need</h2>
+            </div>
+            <div class="subpanel">
+              <h3>Full native/UI build</h3>
+              <ul class="bullet-list">
+                <li>.NET 8 SDK</li>
+                <li>CMake 3.28+</li>
+                <li>MSVC or LLVM with C++20 support</li>
+              </ul>
+            </div>
+            <div class="subpanel">
+              <h3>Benchmark harness</h3>
+              <ul class="bullet-list">
+                <li>Python 3.11+</li>
+                <li>Optional tools on <span class="code">PATH</span> or in standard install locations: <span class="code">7z</span>, <span class="code">Rar.exe</span></li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Quick start</p>
+            <h2>Run the benchmark harness</h2>
+            <p>
+              Build <span class="code">devzip_cli.exe</span> once before running the full matrix so the
+              <span class="code">devzip-native</span> lane is included in the results.
+            </p>
+          </div>
+
+          <div class="command-grid">
+            <article class="command-card">
+              <h3>Build the native lane</h3>
+              <pre><code>cmake --build native/engine/build --target devzip_cli devzip_tests</code></pre>
+            </article>
+            <article class="command-card">
+              <h3>Basic run</h3>
+              <pre><code>python benchmarks/run_benchmarks.py --manifest benchmarks/manifests/mixed-large.json</code></pre>
+            </article>
+            <article class="command-card">
+              <h3>Write the markdown report too</h3>
+              <pre><code>python benchmarks/run_benchmarks.py --manifest benchmarks/manifests/mixed-large.json --markdown-out docs/benchmarks/baseline-results.md</code></pre>
+            </article>
+            <article class="command-card">
+              <h3>Override tool paths</h3>
+              <pre><code>python benchmarks/run_benchmarks.py --manifest benchmarks/manifests/mixed-large.json --tool 7z-lzma2="C:\Program Files\7-Zip\7z.exe" --tool winrar="C:\Program Files\WinRAR\Rar.exe"</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section boundary-panel">
+          <div class="section-heading">
+            <p class="eyebrow">Tooling boundary</p>
+            <h2>What stays out of shipping binaries</h2>
+          </div>
+          <p>
+            <span class="code">7-Zip</span> algorithm lanes, <span class="code">WinRAR</span>, and
+            native Windows ZIP are benchmark peers only. They must not be linked into shipping
+            binaries.
+          </p>
+          <p>
+            The native engine defaults to the <span class="code">best-of-two</span> backend, which compresses each solid group with both LZMA2 and ZPAQ M4 and keeps the smaller result. Experimental native lanes such as <span class="code">best-of-three-ppmd</span> and <span class="code">selective-zpaq5</span> stay inside the <span class="code">.dvz</span> engine and remain benchmark candidates until a full mixed-corpus rerun clears them.
+          </p>
+          <p>
+            Weissman scoring remains enabled in the harness, but the benchmark gate is still based
+            on aggregate end size only.
+          </p>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

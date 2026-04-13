@@ -1,0 +1,168 @@
+{
+  "name": "large-scale",
+  "description": "Large-scale (~1 GB per type) benchmark with real images, generated text/code, duplicates, near-duplicates, and random data. Designed to amplify compression ratio differences between tools.",
+  "timeout_seconds": 1800,
+  "goal": {
+    "aggregate_minimum_win_percent_vs_7z": 5.0,
+    "baseline_tool": "7z-lzma2",
+    "shipping_tool": "devzip-native",
+    "shipping_backend": "zpaq-m4"
+  },
+  "scoring": {
+    "weissman": {
+      "enabled": true,
+      "baseline": "gzip",
+      "alpha": 1.0
+    }
+  },
+  "datasets": [
+    {
+      "id": "large-text",
+      "label": "Large text corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-text",
+      "tags": [
+        "text",
+        "prose",
+        "logs",
+        "duplicates",
+        "large"
+      ]
+    },
+    {
+      "id": "large-code",
+      "label": "Large code corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-code",
+      "tags": [
+        "code",
+        "text",
+        "repetition",
+        "duplicates",
+        "large"
+      ]
+    },
+    {
+      "id": "large-jpeg",
+      "label": "Large jpeg corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-jpeg",
+      "tags": [
+        "image",
+        "binary",
+        "precompressed",
+        "duplicates",
+        "large"
+      ]
+    },
+    {
+      "id": "large-png",
+      "label": "Large png corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-png",
+      "tags": [
+        "image",
+        "binary",
+        "precompressed",
+        "synthetic",
+        "large"
+      ]
+    },
+    {
+      "id": "large-raw",
+      "label": "Large raw corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-raw",
+      "tags": [
+        "image",
+        "binary",
+        "uncompressed",
+        "large"
+      ]
+    },
+    {
+      "id": "large-mixed",
+      "label": "Large mixed corpus (~1 GB)",
+      "path": "sample-data/large-benchmarks/large-mixed",
+      "tags": [
+        "mixed",
+        "text",
+        "image",
+        "binary",
+        "duplicates",
+        "large"
+      ]
+    }
+  ],
+  "tools": {
+    "devzip-native": {
+      "command": [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "{project_root}\\benchmarks\\tools\\run_devzip_native.ps1",
+        "-InputPath",
+        "{input}",
+        "-OutputPath",
+        "{output}"
+      ],
+      "output_extension": ".dvz"
+    },
+    "7z-lzma2": {
+      "command": [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
+        "-Method",
+        "lzma2",
+        "-InputPath",
+        "{input}",
+        "-OutputPath",
+        "{output}"
+      ],
+      "output_extension": ".7z"
+    },
+    "7z-ppmd": {
+      "command": [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
+        "-Method",
+        "ppmd",
+        "-InputPath",
+        "{input}",
+        "-OutputPath",
+        "{output}"
+      ],
+      "output_extension": ".7z"
+    },
+    "winrar": {
+      "command": [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "{project_root}\\benchmarks\\tools\\run_winrar_max.ps1",
+        "-InputPath",
+        "{input}",
+        "-OutputPath",
+        "{output}"
+      ],
+      "output_extension": ".rar"
+    },
+    "windows-zip": {
+      "command": [
+        "powershell",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "{project_root}\\benchmarks\\tools\\run_windows_zip.ps1",
+        "-InputPath",
+        "{input}",
+        "-OutputPath",
+        "{output}"
+      ],
+      "output_extension": ".zip"
+    }
+  }
+}
