@@ -1,6 +1,6 @@
 {
-  "name": "mixed-large",
-  "description": "Representative Windows ratio benchmark matrix for DevZip and desktop archivers.",
+  "name": "ov-exe",
+  "description": "Overhaul benchmark: Native x64 PE binaries",
   "goal": {
     "aggregate_minimum_win_percent_vs_7z": 10.0,
     "baseline_tool": "7z-lzma2",
@@ -16,28 +16,12 @@
   },
   "datasets": [
     {
-      "id": "nato",
-      "label": "Small text corpus",
-      "path": "sample-data/wcDogg-test-files/nato",
-      "tags": ["text", "small"]
-    },
-    {
-      "id": "native-src",
-      "label": "Native engine source tree",
-      "path": "native/engine/src",
-      "tags": ["code", "text", "repetition"]
-    },
-    {
-      "id": "PngSuite",
-      "label": "Small image suite",
-      "path": "sample-data/wcDogg-test-files/PngSuite",
-      "tags": ["image", "binary", "precompressed"]
-    },
-    {
-      "id": "wcDogg",
-      "label": "Large image-heavy corpus",
-      "path": "sample-data/wcDogg-test-files/wcDogg",
-      "tags": ["image", "binary", "precompressed", "large"]
+      "id": "exe",
+      "label": "Native x64 PE binaries",
+      "path": "sample-data/bench/exe",
+      "tags": [
+        "exe"
+      ]
     }
   ],
   "tools": {
@@ -71,22 +55,6 @@
       ],
       "output_extension": ".7z"
     },
-    "7z-lzma": {
-      "command": [
-        "powershell",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
-        "-Method",
-        "lzma",
-        "-InputPath",
-        "{input}",
-        "-OutputPath",
-        "{output}"
-      ],
-      "output_extension": ".7z"
-    },
     "7z-ppmd": {
       "command": [
         "powershell",
@@ -96,38 +64,6 @@
         "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
         "-Method",
         "ppmd",
-        "-InputPath",
-        "{input}",
-        "-OutputPath",
-        "{output}"
-      ],
-      "output_extension": ".7z"
-    },
-    "7z-bzip2": {
-      "command": [
-        "powershell",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
-        "-Method",
-        "bzip2",
-        "-InputPath",
-        "{input}",
-        "-OutputPath",
-        "{output}"
-      ],
-      "output_extension": ".7z"
-    },
-    "7z-deflate": {
-      "command": [
-        "powershell",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "{project_root}\\benchmarks\\tools\\run_7zip_max.ps1",
-        "-Method",
-        "deflate",
         "-InputPath",
         "{input}",
         "-OutputPath",

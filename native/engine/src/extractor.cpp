@@ -6,11 +6,14 @@
 #include "devzip/transform_pipeline.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <memory>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -21,6 +24,124 @@ namespace {
 
 constexpr std::uint64_t kMaxManifestBytes = 256ull * 1024ull * 1024ull;
 constexpr std::uint64_t kMaxPayloadBytes = 2ull * 1024ull * 1024ull * 1024ull;
+
+// Greedy nearest-neighbour similarity ordering for solid groups.
+//
+// Files are first partitioned by extension (so unrelated formats never mix),
+// then within each extension run we reorder by content similarity: a normalised
+// 256-bin byte histogram per block, chained from the largest block to its most
+// similar neighbour.  Placing similar files adjacently lets LZMA2/ZPAQ exploit
+// cross-file redundancy that a plain path sort would scatter.  This is the
+// lightweight, dependency-free analogue of TLSH clustering.
+struct BlockFingerprint {
+  std::array<float, 256> hist{};
+};
+
+BlockFingerprint fingerprint_block(std::span<const std::byte> payload) {
+  BlockFingerprint fp;
+  std::array<std::uint64_t, 256> counts{};
+  if (!payload.empty()) {
+    // Sample up to ~64 KiB spread across the block to bound cost on big inputs.
+    constexpr std::size_t kSampleBudget = 64u * 1024u;
+    const std::size_t stride =
+        payload.size() <= kSampleBudget ? 1 : payload.size() / kSampleBudget;
+    std::uint64_t total = 0;
+    for (std::size_t i = 0; i < payload.size(); i += stride) {
+      ++counts[std::to_integer<unsigned char>(payload[i])];
+      ++total;
+    }
+    if (total != 0) {
+      double norm = 0.0;
+      for (const auto c : counts) {
+        const double v = static_cast<double>(c);
+        norm += v * v;
+      }
+      norm = norm > 0.0 ? std::sqrt(norm) : 1.0;
+      for (std::size_t b = 0; b < 256; ++b) {
+        fp.hist[b] = static_cast<float>(static_cast<double>(counts[b]) / norm);
+      }
+    }
+  }
+  return fp;
+}
+
+float fingerprint_similarity(const BlockFingerprint& a, const BlockFingerprint& b) {
+  float dot = 0.0f;
+  for (std::size_t i = 0; i < 256; ++i) {
+    dot += a.hist[i] * b.hist[i];
+  }
+  return dot;  // both vectors are L2-normalised => cosine similarity
+}
+
+// Reorders pack_items in place: stable extension partition, then greedy
+// nearest-neighbour chaining within each extension run.  O(k^2) per run, so
+// runs larger than kMaxSimilarityRun keep the cheap path order.
+void order_items_by_similarity(std::vector<SolidPackItem>& items) {
+  std::stable_sort(items.begin(), items.end(),
+                   [](const SolidPackItem& a, const SolidPackItem& b) {
+                     const auto ext_a = std::filesystem::path(a.archive_path).extension().string();
+                     const auto ext_b = std::filesystem::path(b.archive_path).extension().string();
+                     if (ext_a != ext_b) {
+                       return ext_a < ext_b;
+                     }
+                     return a.archive_path < b.archive_path;
+                   });
+
+  constexpr std::size_t kMaxSimilarityRun = 4096;
+  std::size_t run_begin = 0;
+  while (run_begin < items.size()) {
+    const auto ext = std::filesystem::path(items[run_begin].archive_path).extension().string();
+    std::size_t run_end = run_begin + 1;
+    while (run_end < items.size() &&
+           std::filesystem::path(items[run_end].archive_path).extension().string() == ext) {
+      ++run_end;
+    }
+    const std::size_t run_len = run_end - run_begin;
+    if (run_len > 2 && run_len <= kMaxSimilarityRun) {
+      std::vector<BlockFingerprint> fps(run_len);
+      for (std::size_t i = 0; i < run_len; ++i) {
+        fps[i] = fingerprint_block(items[run_begin + i].block.payload);
+      }
+      std::vector<char> used(run_len, 0);
+      std::vector<std::size_t> order;
+      order.reserve(run_len);
+      std::size_t start = 0;
+      for (std::size_t i = 1; i < run_len; ++i) {
+        if (items[run_begin + i].block.payload.size() >
+            items[run_begin + start].block.payload.size()) {
+          start = i;
+        }
+      }
+      used[start] = 1;
+      order.push_back(start);
+      std::size_t last = start;
+      for (std::size_t placed = 1; placed < run_len; ++placed) {
+        std::size_t best = run_len;
+        float best_sim = -1.0f;
+        for (std::size_t cand = 0; cand < run_len; ++cand) {
+          if (used[cand]) {
+            continue;
+          }
+          const float sim = fingerprint_similarity(fps[last], fps[cand]);
+          if (sim > best_sim) {
+            best_sim = sim;
+            best = cand;
+          }
+        }
+        used[best] = 1;
+        order.push_back(best);
+        last = best;
+      }
+      std::vector<SolidPackItem> reordered;
+      reordered.reserve(run_len);
+      for (const auto idx : order) {
+        reordered.push_back(std::move(items[run_begin + idx]));
+      }
+      std::move(reordered.begin(), reordered.end(), items.begin() + run_begin);
+    }
+    run_begin = run_end;
+  }
+}
 
 std::string to_hex(const std::array<std::uint8_t, 16>& checksum) {
   static constexpr char kHex[] = "0123456789abcdef";
@@ -487,11 +608,12 @@ void verify_archive_loaded(const ArchivePayload& archive, CompressionBackend* ba
 
 ArchiveWriteResult create_archive(const std::filesystem::path& source_path,
                                   const std::filesystem::path& archive_path,
-                                  CompressionBackend& backend) {
+                                  CompressionBackend& backend,
+                                  const CompressionOptions& options) {
   auto scan = scan_source_tree(source_path);
   auto manifest = scan.manifest;
   manifest.backend = backend.stamp();
-  TransformPipeline pipeline;
+  TransformPipeline pipeline(options);
   SolidPacker solid_packer;
 
   std::vector<std::vector<std::byte>> encoded_payloads;
@@ -575,17 +697,9 @@ ArchiveWriteResult create_archive(const std::filesystem::path& source_path,
     }
   }
 
-  // Sort items by file extension so that similar content lands in the same solid
-  // groups, giving LZMA2 a larger homogeneous context to exploit.
-  std::stable_sort(pack_items.begin(), pack_items.end(),
-                   [](const SolidPackItem& a, const SolidPackItem& b) {
-                     const auto ext_a = std::filesystem::path(a.archive_path).extension().string();
-                     const auto ext_b = std::filesystem::path(b.archive_path).extension().string();
-                     if (ext_a != ext_b) {
-                       return ext_a < ext_b;
-                     }
-                     return a.archive_path < b.archive_path;
-                   });
+  // Order items so similar content lands adjacently in solid groups, giving
+  // LZMA2/ZPAQ a larger homogeneous context to exploit cross-file redundancy.
+  order_items_by_similarity(pack_items);
 
   // Parallel compression: each solid group is independent, so we launch them
   // concurrently.  Each task gets its own backend instance (created from the
@@ -617,13 +731,23 @@ ArchiveWriteResult create_archive(const std::filesystem::path& source_path,
   }();
 
   auto groups = solid_packer.pack(pack_items);
+  const bool verify_roundtrip = options.verify_roundtrip;
   auto compress_group =
-      [](SolidPackGroup group,
+      [verify_roundtrip](SolidPackGroup group,
          std::string content_name,
          CompressionBackend& group_backend) -> CompressedGroupResult {
     CompressionResponse compressed;
     if (!group.prefer_stored_raw) {
       compressed = group_backend.compress(CompressionRequest{group.payload, content_name});
+      if (verify_roundtrip && !compressed.encoded.empty()) {
+        const auto check =
+            group_backend.decompress(compressed.encoded, group.payload.size());
+        if (check.size() != group.payload.size() ||
+            std::memcmp(check.data(), group.payload.data(), check.size()) != 0) {
+          throw std::runtime_error(
+              "Create-time roundtrip verification failed for block in " + content_name);
+        }
+      }
     }
     const bool store_raw =
         group.prefer_stored_raw ||

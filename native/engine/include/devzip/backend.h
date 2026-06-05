@@ -40,6 +40,20 @@ std::unique_ptr<CompressionBackend> make_ppmd_backend();
 std::unique_ptr<CompressionBackend> make_best_of_two_backend(std::string zpaq_method = "4");
 std::unique_ptr<CompressionBackend> make_best_of_three_backend();
 std::unique_ptr<CompressionBackend> make_selective_zpaq_backend();
+
+// libbsc BWT/ST block-sorting backend.  Returns nullptr if libbsc was not
+// compiled in.
+std::unique_ptr<CompressionBackend> make_bsc_backend();
+bool bsc_backend_available();
+
+// best-of-N: tries several codecs and keeps the smallest, tagging each block
+// with the winning codec.  The `spec` selects which codecs are attempted and is
+// round-tripped through the backend stamp version so parallel-group compression
+// and extraction reconstruct an equivalent backend.  Format:
+//   comma-separated of {lzma2, zpaqN (N=method digit), ppmd, bsc}
+// e.g. "lzma2,zpaq5,ppmd,bsc".
+std::unique_ptr<CompressionBackend> make_best_of_n_backend(const std::string& spec);
+
 std::unique_ptr<CompressionBackend> make_backend(const BackendStamp& stamp);
 
 }  // namespace devzip

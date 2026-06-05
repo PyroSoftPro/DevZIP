@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private string _statusDetail = "Drag a file or folder into the target to start compression.";
     private string _outputPath = "No archive created yet.";
     private CompressionState _state = CompressionState.Idle;
+    private CompressionLevel _selectedLevel = CompressionLevel.Balanced;
 
     public MainWindowViewModel(ICompressionJobRunner runner, OutputPathPolicy outputPathPolicy)
     {
@@ -43,6 +44,20 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public IReadOnlyList<CompressionLevel> AvailableLevels { get; } = new[]
+    {
+        CompressionLevel.Fast,
+        CompressionLevel.Balanced,
+        CompressionLevel.Max,
+        CompressionLevel.Insane
+    };
+
+    public CompressionLevel SelectedLevel
+    {
+        get => _selectedLevel;
+        set => SetField(ref _selectedLevel, value);
+    }
 
     public CompressionState State
     {
@@ -163,7 +178,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             var result = await _runner.RunAsync(
-                new CompressionJobRequest(sourcePath, OutputPath),
+                new CompressionJobRequest(sourcePath, OutputPath, SelectedLevel),
                 progress,
                 _cancellationTokenSource.Token);
 

@@ -5,6 +5,19 @@ extern "C" {
 #include "miniz.h"
 }
 
+#if defined(DEVZIP_HAVE_BRUNSLI)
+extern "C" {
+#include <brunsli/decode.h>
+#include <brunsli/encode.h>
+}
+#endif
+
+#if defined(DEVZIP_HAVE_PREFLATE)
+#include "preflate_decoder.h"
+#include "preflate_reencoder.h"
+#include "support/memstream.h"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -140,6 +153,58 @@ bool is_pe_executable(std::span<const std::byte> input, std::string_view archive
     return true;
   }
   return starts_with_bytes(input, {0x4D, 0x5A});
+}
+
+// Which branch converter (if any) helps a given executable.  The LZMA SDK X86
+// converter only models 32-bit x86 CALL/JMP encodings well; applied to x64 it
+// adds noise (high E8/E9 false-positive density) and measurably *hurts* ratio.
+// We therefore read the PE COFF machine word and pick the matching converter,
+// falling back to "no filter" for architectures we cannot improve.
+enum class BranchFilter { None, X86, Arm64, Arm, ArmThumb };
+
+BranchFilter select_branch_filter(std::span<const std::byte> input) {
+  // DOS header: 'MZ' + e_lfanew (LE u32) at offset 0x3C points at the PE header.
+  if (input.size() < 0x40 || !starts_with_bytes(input, {0x4D, 0x5A})) {
+    return BranchFilter::None;
+  }
+  const auto* bytes = reinterpret_cast<const std::uint8_t*>(input.data());
+  const std::uint32_t pe_offset = static_cast<std::uint32_t>(bytes[0x3C]) |
+                                  (static_cast<std::uint32_t>(bytes[0x3D]) << 8) |
+                                  (static_cast<std::uint32_t>(bytes[0x3E]) << 16) |
+                                  (static_cast<std::uint32_t>(bytes[0x3F]) << 24);
+  // Need 'PE\0\0' (4) + machine word (2).
+  if (static_cast<std::size_t>(pe_offset) + 6 > input.size()) {
+    return BranchFilter::None;
+  }
+  if (bytes[pe_offset] != 'P' || bytes[pe_offset + 1] != 'E' ||
+      bytes[pe_offset + 2] != 0 || bytes[pe_offset + 3] != 0) {
+    return BranchFilter::None;
+  }
+  const std::uint16_t machine = static_cast<std::uint16_t>(bytes[pe_offset + 4]) |
+                                (static_cast<std::uint16_t>(bytes[pe_offset + 5]) << 8);
+  switch (machine) {
+    case 0x014C:  // IMAGE_FILE_MACHINE_I386
+      return BranchFilter::X86;
+    case 0xAA64:  // IMAGE_FILE_MACHINE_ARM64
+      return BranchFilter::Arm64;
+    case 0x01C0:  // IMAGE_FILE_MACHINE_ARM
+      return BranchFilter::Arm;
+    case 0x01C4:  // IMAGE_FILE_MACHINE_ARMNT (Thumb-2)
+      return BranchFilter::ArmThumb;
+    case 0x8664:  // IMAGE_FILE_MACHINE_AMD64 - X86 CALL/JMP filter still helps.
+      return BranchFilter::X86;
+    default:
+      return BranchFilter::None;
+  }
+}
+
+bool is_jpeg(std::span<const std::byte> input, std::string_view archive_path) {
+  if (starts_with_bytes(input, {0xFF, 0xD8, 0xFF})) {
+    return true;
+  }
+  const auto extension = lower_ascii(
+      std::filesystem::path(std::string(archive_path)).extension().string());
+  return extension == ".jpg" || extension == ".jpeg" || extension == ".jpe";
 }
 
 bool is_delta_candidate(std::string_view archive_path) {
@@ -369,6 +434,56 @@ std::vector<std::byte> reverse_bcj_x86(std::span<const std::byte> input) {
   return output;
 }
 
+// RISC branch converters (ARM64/ARM/ARMT) are stateless: they rewrite CALL/BL
+// relative targets to absolute so the entropy coder sees repeated address bytes.
+std::vector<std::byte> apply_bcj_arm64(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARM64_Enc(reinterpret_cast<Byte*>(output.data()),
+                          static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
+std::vector<std::byte> reverse_bcj_arm64(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARM64_Dec(reinterpret_cast<Byte*>(output.data()),
+                          static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
+std::vector<std::byte> apply_bcj_arm(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARM_Enc(reinterpret_cast<Byte*>(output.data()),
+                        static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
+std::vector<std::byte> reverse_bcj_arm(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARM_Dec(reinterpret_cast<Byte*>(output.data()),
+                        static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
+std::vector<std::byte> apply_bcj_arm_thumb(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARMT_Enc(reinterpret_cast<Byte*>(output.data()),
+                         static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
+std::vector<std::byte> reverse_bcj_arm_thumb(std::span<const std::byte> input) {
+  if (input.empty()) return {};
+  std::vector<std::byte> output(input.begin(), input.end());
+  z7_BranchConv_ARMT_Dec(reinterpret_cast<Byte*>(output.data()),
+                         static_cast<SizeT>(output.size()), 0);
+  return output;
+}
+
 std::vector<std::byte> apply_delta_filter(std::span<const std::byte> input) {
   if (input.empty()) {
     return {};
@@ -508,6 +623,227 @@ std::vector<std::byte> reverse_png_idat_strip(
   return png_out;
 }
 
+// ---------------------------------------------------------------------------
+// brunsli JPEG transcoding
+// ---------------------------------------------------------------------------
+#if defined(DEVZIP_HAVE_BRUNSLI)
+namespace {
+size_t brunsli_sink(void* out_data, const std::uint8_t* buf, size_t size) {
+  auto* sink = static_cast<std::vector<std::byte>*>(out_data);
+  const auto* begin = reinterpret_cast<const std::byte*>(buf);
+  sink->insert(sink->end(), begin, begin + size);
+  return size;
+}
+}  // namespace
+
+bool brunsli_available() { return true; }
+
+std::vector<std::byte> apply_jpeg_brunsli(std::span<const std::byte> input) {
+  if (input.size() < 3) {
+    return {};
+  }
+  std::vector<std::byte> output;
+  output.reserve(input.size() / 2 + 64);
+  const int ok = EncodeBrunsli(input.size(),
+                               reinterpret_cast<const unsigned char*>(input.data()),
+                               &output, &brunsli_sink);
+  if (ok != 1 || output.empty()) {
+    return {};
+  }
+  return output;
+}
+
+std::vector<std::byte> reverse_jpeg_brunsli(std::span<const std::byte> input,
+                                            std::size_t expected_size) {
+  std::vector<std::byte> output;
+  output.reserve(expected_size ? expected_size : input.size() * 2 + 64);
+  const int ok = DecodeBrunsli(input.size(),
+                               reinterpret_cast<const std::uint8_t*>(input.data()),
+                               &output, &brunsli_sink);
+  if (ok != 1) {
+    throw std::runtime_error("brunsli failed to reconstruct JPEG stream");
+  }
+  return output;
+}
+#else
+bool brunsli_available() { return false; }
+std::vector<std::byte> apply_jpeg_brunsli(std::span<const std::byte>) { return {}; }
+std::vector<std::byte> reverse_jpeg_brunsli(std::span<const std::byte>, std::size_t) {
+  throw std::runtime_error("brunsli support was not compiled in");
+}
+#endif
+
+// ---------------------------------------------------------------------------
+// preflate PNG recompression
+// ---------------------------------------------------------------------------
+#if defined(DEVZIP_HAVE_PREFLATE)
+
+// Recipe layout (little-endian):
+//   [4]  magic 0x50464C54 ("PFLT")
+//   [1]  zlib CMF
+//   [1]  zlib FLG
+//   [4]  adler32 (as stored, big-endian-order bytes copied verbatim)
+//   [4]  num_idat ; [4*num_idat] original IDAT chunk sizes
+//   [4]  pre_idat len ; [..] pre_idat bytes
+//   [4]  post_idat len ; [..] post_idat bytes
+//   [4]  diff len ; [..] preflate reconstruction diff
+bool preflate_available() { return true; }
+
+std::vector<std::byte> apply_png_preflate(std::span<const std::byte> input,
+                                          std::string& recipe_out) {
+  const auto chunks = parse_png_chunks(input);
+  if (chunks.empty()) return {};
+
+  std::vector<std::uint8_t> combined_idat;
+  std::vector<std::uint32_t> idat_sizes;
+  std::vector<std::byte> pre_idat;
+  std::vector<std::byte> post_idat;
+  bool seen_idat = false;
+
+  auto emit_chunk = [](std::vector<std::byte>& dest, const PngChunk& ch) {
+    write_u32be(dest, static_cast<std::uint32_t>(ch.data.size()));
+    dest.push_back(static_cast<std::byte>((ch.type >> 24) & 0xFF));
+    dest.push_back(static_cast<std::byte>((ch.type >> 16) & 0xFF));
+    dest.push_back(static_cast<std::byte>((ch.type >> 8) & 0xFF));
+    dest.push_back(static_cast<std::byte>(ch.type & 0xFF));
+    for (const auto b : ch.data) dest.push_back(static_cast<std::byte>(b));
+    write_u32be(dest, ch.crc);
+  };
+
+  for (const auto b : kPngSignature) pre_idat.push_back(static_cast<std::byte>(b));
+  for (const auto& ch : chunks) {
+    if (is_idat(ch.type)) {
+      seen_idat = true;
+      idat_sizes.push_back(static_cast<std::uint32_t>(ch.data.size()));
+      combined_idat.insert(combined_idat.end(), ch.data.begin(), ch.data.end());
+    } else if (!seen_idat) {
+      emit_chunk(pre_idat, ch);
+    } else {
+      emit_chunk(post_idat, ch);
+    }
+  }
+
+  // zlib stream = [CMF][FLG][deflate...][ADLER32]; need at least that framing.
+  if (combined_idat.size() < 7) return {};
+
+  std::vector<std::uint8_t> deflate_plus(combined_idat.begin() + 2, combined_idat.end());
+  MemStream mem(deflate_plus);
+  std::vector<unsigned char> unpacked;
+  std::vector<unsigned char> diff;
+  std::uint64_t deflate_size = 0;
+  const bool ok = preflate_decode(unpacked, diff, deflate_size, mem, [] {}, 0, INT32_MAX);
+  if (!ok || diff.empty()) return {};
+  // The 4 bytes following the deflate stream are the zlib adler32 checksum.
+  if (static_cast<std::size_t>(2 + deflate_size + 4) != combined_idat.size()) return {};
+
+  std::string recipe;
+  write_le32(recipe, 0x50464C54u);
+  recipe.push_back(static_cast<char>(combined_idat[0]));
+  recipe.push_back(static_cast<char>(combined_idat[1]));
+  for (std::size_t i = 0; i < 4; ++i) {
+    recipe.push_back(static_cast<char>(combined_idat[2 + deflate_size + i]));
+  }
+  write_le32(recipe, static_cast<std::uint32_t>(idat_sizes.size()));
+  for (const auto sz : idat_sizes) write_le32(recipe, sz);
+  write_le32(recipe, static_cast<std::uint32_t>(pre_idat.size()));
+  recipe.append(reinterpret_cast<const char*>(pre_idat.data()), pre_idat.size());
+  write_le32(recipe, static_cast<std::uint32_t>(post_idat.size()));
+  recipe.append(reinterpret_cast<const char*>(post_idat.data()), post_idat.size());
+  write_le32(recipe, static_cast<std::uint32_t>(diff.size()));
+  recipe.append(reinterpret_cast<const char*>(diff.data()), diff.size());
+  recipe_out = std::move(recipe);
+
+  std::vector<std::byte> result(unpacked.size());
+  if (!unpacked.empty()) std::memcpy(result.data(), unpacked.data(), unpacked.size());
+  return result;
+}
+
+std::vector<std::byte> reverse_png_preflate(std::span<const std::byte> raw_pixels,
+                                            const std::string& recipe_str) {
+  const char* p = recipe_str.data();
+  const char* end = p + recipe_str.size();
+  auto need = [&](std::size_t n) { return (end - p) >= static_cast<std::ptrdiff_t>(n); };
+
+  if (!need(4) || read_le32(p) != 0x50464C54u) {
+    throw std::runtime_error("PNG preflate: corrupt recipe magic");
+  }
+  p += 4;
+  if (!need(6)) throw std::runtime_error("PNG preflate: truncated header");
+  const std::uint8_t cmf = static_cast<std::uint8_t>(*p++);
+  const std::uint8_t flg = static_cast<std::uint8_t>(*p++);
+  std::uint8_t adler[4];
+  for (auto& a : adler) a = static_cast<std::uint8_t>(*p++);
+  if (!need(4)) throw std::runtime_error("PNG preflate: truncated idat table");
+  const std::uint32_t num_idat = read_le32(p); p += 4;
+  if (!need(4ull * num_idat)) throw std::runtime_error("PNG preflate: bad idat table");
+  std::vector<std::uint32_t> idat_sizes(num_idat);
+  for (auto& sz : idat_sizes) { sz = read_le32(p); p += 4; }
+  if (!need(4)) throw std::runtime_error("PNG preflate: truncated pre");
+  const std::uint32_t pre_len = read_le32(p); p += 4;
+  if (!need(pre_len)) throw std::runtime_error("PNG preflate: truncated pre bytes");
+  const char* pre_ptr = p; p += pre_len;
+  if (!need(4)) throw std::runtime_error("PNG preflate: truncated post");
+  const std::uint32_t post_len = read_le32(p); p += 4;
+  if (!need(post_len)) throw std::runtime_error("PNG preflate: truncated post bytes");
+  const char* post_ptr = p; p += post_len;
+  if (!need(4)) throw std::runtime_error("PNG preflate: truncated diff");
+  const std::uint32_t diff_len = read_le32(p); p += 4;
+  if (!need(diff_len)) throw std::runtime_error("PNG preflate: truncated diff bytes");
+  std::vector<unsigned char> diff(reinterpret_cast<const unsigned char*>(p),
+                                  reinterpret_cast<const unsigned char*>(p) + diff_len);
+
+  std::vector<unsigned char> unpacked(raw_pixels.size());
+  if (!raw_pixels.empty()) std::memcpy(unpacked.data(), raw_pixels.data(), raw_pixels.size());
+
+  std::vector<unsigned char> deflate_body;
+  if (!preflate_reencode(deflate_body, diff, unpacked)) {
+    throw std::runtime_error("PNG preflate: failed to reconstruct deflate stream");
+  }
+
+  std::vector<std::uint8_t> combined_idat;
+  combined_idat.reserve(deflate_body.size() + 6);
+  combined_idat.push_back(cmf);
+  combined_idat.push_back(flg);
+  combined_idat.insert(combined_idat.end(), deflate_body.begin(), deflate_body.end());
+  for (const auto a : adler) combined_idat.push_back(a);
+
+  std::vector<std::byte> png_out;
+  png_out.insert(png_out.end(), reinterpret_cast<const std::byte*>(pre_ptr),
+                 reinterpret_cast<const std::byte*>(pre_ptr) + pre_len);
+
+  static const std::uint8_t kIdatType[4] = {'I', 'D', 'A', 'T'};
+  std::size_t pos = 0;
+  for (const std::uint32_t idat_size : idat_sizes) {
+    if (pos + idat_size > combined_idat.size()) {
+      throw std::runtime_error("PNG preflate: rebuilt stream shorter than expected");
+    }
+    const auto* chunk_data = combined_idat.data() + pos;
+    std::uint32_t c = crc32_for(kIdatType, 4);
+    c = static_cast<std::uint32_t>(mz_crc32(static_cast<mz_ulong>(c), chunk_data, idat_size));
+    write_u32be(png_out, idat_size);
+    for (const auto b : kIdatType) png_out.push_back(static_cast<std::byte>(b));
+    for (std::uint32_t i = 0; i < idat_size; ++i) {
+      png_out.push_back(static_cast<std::byte>(chunk_data[i]));
+    }
+    write_u32be(png_out, c);
+    pos += idat_size;
+  }
+  if (pos != combined_idat.size()) {
+    throw std::runtime_error("PNG preflate: idat sizes do not cover the stream");
+  }
+
+  png_out.insert(png_out.end(), reinterpret_cast<const std::byte*>(post_ptr),
+                 reinterpret_cast<const std::byte*>(post_ptr) + post_len);
+  return png_out;
+}
+#else
+bool preflate_available() { return false; }
+std::vector<std::byte> apply_png_preflate(std::span<const std::byte>, std::string&) { return {}; }
+std::vector<std::byte> reverse_png_preflate(std::span<const std::byte>, const std::string&) {
+  throw std::runtime_error("preflate support was not compiled in");
+}
+#endif
+
 }  // namespace transforms
 
 PreparedFile TransformPipeline::prepare_file(std::span<const std::byte> input,
@@ -531,19 +867,127 @@ PreparedFile TransformPipeline::prepare_file(std::span<const std::byte> input,
 
   const bool prefer_raw = prefers_stored_raw(input, archive_path);
 
-  if (!prefer_raw && is_pe_executable(input, archive_path)) {
-    auto bcj_payload = transforms::apply_bcj_x86(input);
-    PreparedBlock block;
-    block.payload = std::move(bcj_payload);
-    block.fallback_payload.assign(input.begin(), input.end());
-    block.payload_checksum = checksum_bytes(block.payload);
-    block.fallback_checksum = checksum_bytes(block.fallback_payload);
-    block.transforms = {TransformKind::BcjX86};
-    prepared.blocks.push_back(std::move(block));
-    return prepared;
+  const bool is_png_input =
+      starts_with_bytes(input, {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
+
+  // PNG via preflate: undo the IDAT deflate to raw filtered pixel bytes plus a
+  // reconstruction recipe.  Unlike the level-match IDAT strip below, preflate
+  // reconstructs ANY deflate encoder's output bit-exactly, so it engages on the
+  // PNGs that the strip path cannot handle.  We re-deflate immediately and
+  // compare to guarantee a byte-exact roundtrip before committing.
+  if (!prefer_raw && is_png_input && options_.enable_preflate &&
+      transforms::preflate_available()) {
+    std::string preflate_recipe;
+    auto preflate_payload = transforms::apply_png_preflate(input, preflate_recipe);
+    if (!preflate_payload.empty() && !preflate_recipe.empty()) {
+      bool exact = false;
+      try {
+        const auto restored =
+            transforms::reverse_png_preflate(preflate_payload, preflate_recipe);
+        exact = restored.size() == input.size() &&
+                std::memcmp(restored.data(), input.data(), input.size()) == 0;
+      } catch (...) {
+        exact = false;
+      }
+      if (exact) {
+        PreparedBlock block;
+        block.payload = std::move(preflate_payload);
+        block.fallback_payload.assign(input.begin(), input.end());
+        block.payload_checksum = checksum_bytes(block.payload);
+        block.fallback_checksum = checksum_bytes(block.fallback_payload);
+        block.transforms = {TransformKind::PreflateDeflate};
+        block.recipe = std::move(preflate_recipe);
+        prepared.blocks.push_back(std::move(block));
+        return prepared;
+      }
+    }
   }
 
-  if (!prefer_raw && is_delta_candidate(archive_path)) {
+  // PNG IDAT strip: inflate the embedded deflate stream so the backend can model
+  // the raw pixel bytes (which compress far better than already-deflated IDAT).
+  // apply_png_idat_strip only returns data when it can re-deflate to the exact
+  // original bytes, so the transform is always lossless / self-verifying.
+  if (!prefer_raw && options_.enable_png_idat_strip && is_png_input) {
+    std::string png_recipe;
+    auto png_payload = transforms::apply_png_idat_strip(input, png_recipe);
+    if (!png_payload.empty() && !png_recipe.empty()) {
+      PreparedBlock block;
+      block.payload = std::move(png_payload);
+      block.fallback_payload.assign(input.begin(), input.end());
+      block.payload_checksum = checksum_bytes(block.payload);
+      block.fallback_checksum = checksum_bytes(block.fallback_payload);
+      block.transforms = {TransformKind::PngIdatStrip};
+      block.recipe = std::move(png_recipe);
+      prepared.blocks.push_back(std::move(block));
+      return prepared;
+    }
+  }
+
+  // JPEG -> brunsli transcode.  brunsli is lossless, but not every JPEG variant
+  // is supported, so we re-decode the transcoded stream and compare byte-for-byte
+  // before committing; any mismatch falls through to the normal path.
+  if (!prefer_raw && options_.enable_brunsli && transforms::brunsli_available() &&
+      is_jpeg(input, archive_path)) {
+    auto brunsli_payload = transforms::apply_jpeg_brunsli(input);
+    if (!brunsli_payload.empty() && brunsli_payload.size() < input.size()) {
+      bool exact = false;
+      try {
+        const auto restored = transforms::reverse_jpeg_brunsli(brunsli_payload, input.size());
+        exact = restored.size() == input.size() &&
+                std::memcmp(restored.data(), input.data(), input.size()) == 0;
+      } catch (...) {
+        exact = false;
+      }
+      if (exact) {
+        PreparedBlock block;
+        block.payload = std::move(brunsli_payload);
+        block.fallback_payload.assign(input.begin(), input.end());
+        block.payload_checksum = checksum_bytes(block.payload);
+        block.fallback_checksum = checksum_bytes(block.fallback_payload);
+        block.transforms = {TransformKind::JpegBrunsli};
+        prepared.blocks.push_back(std::move(block));
+        return prepared;
+      }
+    }
+  }
+
+  if (!prefer_raw && options_.enable_bcj && is_pe_executable(input, archive_path)) {
+    const BranchFilter filter = select_branch_filter(input);
+    if (filter != BranchFilter::None) {
+      std::vector<std::byte> bcj_payload;
+      TransformKind kind = TransformKind::BcjX86;
+      switch (filter) {
+        case BranchFilter::X86:
+          bcj_payload = transforms::apply_bcj_x86(input);
+          kind = TransformKind::BcjX86;
+          break;
+        case BranchFilter::Arm64:
+          bcj_payload = transforms::apply_bcj_arm64(input);
+          kind = TransformKind::BcjArm64;
+          break;
+        case BranchFilter::Arm:
+          bcj_payload = transforms::apply_bcj_arm(input);
+          kind = TransformKind::BcjArm;
+          break;
+        case BranchFilter::ArmThumb:
+          bcj_payload = transforms::apply_bcj_arm_thumb(input);
+          kind = TransformKind::BcjArmThumb;
+          break;
+        case BranchFilter::None:
+          break;
+      }
+      PreparedBlock block;
+      block.payload = std::move(bcj_payload);
+      block.fallback_payload.assign(input.begin(), input.end());
+      block.payload_checksum = checksum_bytes(block.payload);
+      block.fallback_checksum = checksum_bytes(block.fallback_payload);
+      block.transforms = {kind};
+      prepared.blocks.push_back(std::move(block));
+      return prepared;
+    }
+  }
+
+  if (!prefer_raw && options_.enable_delta && is_delta_candidate(archive_path)) {
     auto delta_payload = transforms::apply_delta_filter(input);
     PreparedBlock block;
     block.payload = std::move(delta_payload);
@@ -556,6 +1000,26 @@ PreparedFile TransformPipeline::prepare_file(std::span<const std::byte> input,
   }
 
   const bool text_like_input = transforms::looks_like_text(input);
+
+  // Code dictionary: substitute frequent multi-byte tokens with short escapes
+  // before the backend sees the bytes. apply_code_dictionary returns an empty
+  // recipe (and the original bytes) when it cannot shrink the input.
+  if (!prefer_raw && options_.enable_code_dictionary && text_like_input) {
+    std::string code_recipe;
+    auto code_payload = transforms::apply_code_dictionary(input, code_recipe);
+    if (!code_recipe.empty() && code_payload.size() < input.size()) {
+      PreparedBlock block;
+      block.payload = std::move(code_payload);
+      block.fallback_payload.assign(input.begin(), input.end());
+      block.payload_checksum = checksum_bytes(block.payload);
+      block.fallback_checksum = checksum_bytes(block.fallback_payload);
+      block.transforms = {TransformKind::CodeDictionary};
+      block.recipe = std::move(code_recipe);
+      prepared.blocks.push_back(std::move(block));
+      return prepared;
+    }
+  }
+
   if (should_chunk_file(input, archive_path, prefer_raw, text_like_input)) {
     const auto chunks = transforms::fastcdc_chunk_bytes(input);
     if (chunks.size() > 1) {
@@ -606,11 +1070,26 @@ std::vector<std::byte> TransformPipeline::restore_file(const ManifestEntry& entr
         case TransformKind::BcjX86:
           payload = transforms::reverse_bcj_x86(payload);
           break;
+        case TransformKind::BcjArm64:
+          payload = transforms::reverse_bcj_arm64(payload);
+          break;
+        case TransformKind::BcjArm:
+          payload = transforms::reverse_bcj_arm(payload);
+          break;
+        case TransformKind::BcjArmThumb:
+          payload = transforms::reverse_bcj_arm_thumb(payload);
+          break;
         case TransformKind::DeltaFilter:
           payload = transforms::reverse_delta_filter(payload);
           break;
         case TransformKind::PngIdatStrip:
           payload = transforms::reverse_png_idat_strip(payload, decoded.recipe);
+          break;
+        case TransformKind::JpegBrunsli:
+          payload = transforms::reverse_jpeg_brunsli(payload, 0);
+          break;
+        case TransformKind::PreflateDeflate:
+          payload = transforms::reverse_png_preflate(payload, decoded.recipe);
           break;
       }
     }

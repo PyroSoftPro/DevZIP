@@ -2,6 +2,7 @@
 
 #include "devzip/archive_format.h"
 #include "devzip/backend.h"
+#include "devzip/compression_options.h"
 
 #include <filesystem>
 
@@ -14,7 +15,8 @@ struct ArchiveWriteResult {
 
 ArchiveWriteResult create_archive(const std::filesystem::path& source_path,
                                   const std::filesystem::path& archive_path,
-                                  CompressionBackend& backend);
+                                  CompressionBackend& backend,
+                                  const CompressionOptions& options = {});
 
 ArchiveManifest read_archive_manifest(const std::filesystem::path& archive_path);
 

@@ -8,9 +8,9 @@ The project is focused on size-first compression for mixed real-world datasets. 
 
 ## Status
 
-- Shipping native lane: `best-of-two`
-- Archive format: readable `.dvz`
-- Native CLI: `compress`, `extract`, `verify`
+- Shipping default: `balanced` level (`best-of-N`: LZMA2 vs ZPAQ-5)
+- Archive format: readable `.dvz` v4
+- Native CLI: `compress`, `extract`, `verify` (with `--level` and `--backend`)
 - Desktop app: WPF shell in `apps/windows-ui/DevZip.App`
 - Public repo note: large generated corpora and benchmark output are intentionally excluded to keep the repository lightweight
 
@@ -20,79 +20,76 @@ DevZIP is trying to answer a practical question: can a custom archival container
 
 The current answer is promising:
 
-- The shipping native lane beats `7z-lzma2` on the latest `mixed-large` aggregate rerun.
+- After the compression overhaul, DevZIP beats `7z-lzma2` by `-18.0%` in aggregate across the per-type sweep, winning every category (text, code, executables, JPEG, PNG).
 - The archive remains self-describing by stamping the backend identity into the manifest.
 - Experimental backend lanes still produce readable `.dvz` archives and can be compared without changing the container format.
 - The current shipping lane is the stable "final form." The experimental ones are still in the gravity chamber.
 
 ## Top Victories
 
-If the goal is to show where DevZIP looks strongest today, these are the headline wins of the current shipping lane against the project's main size baseline, `7z-lzma2`.
+Headline wins from the compression overhaul sweep, against the project's main
+size baseline `7z-lzma2`. Every DevZIP figure round-trips byte-exact. `balanced`
+is the default; `max` adds the preflate PNG path. Lower is better.
 
-| Category | DevZIP (MB) | `7z-lzma2` (MB) | Win |
-| --- | ---: | ---: | ---: |
-| Text and structured data | 0.513 | 0.762 | -32.67% |
-| Raw bitmaps | 59.244 | 77.786 | -23.84% |
-| Mixed-large aggregate | 143.815 | 144.841 | -0.71% |
-| JPEG photographs | 79.842 | 81.095 | -1.54% |
-| PNG lossless images | 15.870 | 16.021 | -0.95% |
-| Video (raw YUV) | 1.854 | 1.871 | -0.94% |
-| Random / high-entropy | 10.486 | 10.487 | -0.01% |
+| Category | DevZIP `balanced` (MB) | DevZIP `max` (MB) | `7z-lzma2` (MB) | Best win |
+| --- | ---: | ---: | ---: | ---: |
+| Text and structured data | 0.901 | 0.901 | 1.520 | **-40.7%** |
+| JPEG photographs | 19.018 | 19.018 | 24.337 | **-21.9%** |
+| PNG lossless images | 20.960 | 17.550 | 21.002 | **-16.4%** |
+| Code | 0.162 | 0.162 | 0.193 | **-16.1%** |
+| Software binaries (PE) | 6.936 | 6.930 | 7.265 | **-4.6%** |
+| **Aggregate** | **47.977** | **44.561** | **54.317** | **-18.0%** |
 
-Those are the strongest current wins. The only category still not clearly ahead in the shipping lane is software binaries, where DevZIP is near-tied at `+0.32%`; the experimental `selective-zpaq5` lane is currently the strongest measured code-heavy follow-up.
+The overhaul flipped the two categories that used to lag: JPEG (`-1.5%` -> `-21.9%`
+via the brunsli lossless transcode), PNG (`-0.95%` -> `-16.4%` via preflate), and
+software binaries (`+0.32%` loss -> `-4.6%` win via architecture-aware BCJ + ZPAQ-5).
+The aggregate moved from roughly break-even into a **double-digit, -18%** win.
 
-## Full Aggregate Comparison
+## Aggregate Comparison
 
-Latest shipping-lane aggregate result from `mixed-large`:
+Sum across the overhaul per-type sweep (text, code, exe, JPEG, PNG; 97.41 MB raw):
 
-| Tool | Status | End Size (MB) | Total Time (s) | Delta vs 7z-lzma2 |
-| --- | --- | ---: | ---: | ---: |
-| `devzip-native` | ok | 143.815 | 304.2 | -0.71% |
-| `7z-lzma2` | ok | 144.841 | 107.2 | +0.00% |
-| `7z-lzma` | ok | 144.846 | 107.1 | +0.00% |
-| `winrar` | ok | 148.261 | 48.9 | +2.36% |
-| `7z-ppmd` | ok | 149.306 | 86.1 | +3.08% |
-| `7z-bzip2` | ok | 160.398 | 265.2 | +10.74% |
-| `windows-zip` | ok | 181.973 | 13.8 | +25.64% |
+| Tool | End Size (MB) | Delta vs 7z-lzma2 |
+| --- | ---: | ---: |
+| `devzip max` | 44.561 | **-18.0%** |
+| `devzip balanced` (default) | 47.977 | **-11.7%** |
+| `7z-lzma2` | 54.317 | +0.00% |
 
 Notes:
 
-- Lower end size is better.
-- The `7z-deflate` lane is omitted here because the latest aggregate run was partial, not a clean apples-to-apples result.
-- Weissman scoring is still tracked internally, but DevZIP is gated primarily on end size.
-- The table above is the full aggregate view. The section above it is the curated "greatest hits" version.
-- The goal is smaller archives, not yelling until the compression ratio goes over 9000.
+- Lower end size is better; every DevZIP figure round-trips byte-exact.
+- Against the best 7-Zip method per category (lzma2 or ppmd), `devzip max` is still `-17.5%`.
+- DevZIP trades time for size (ZPAQ-5 + preflate). Full timings are in `docs/benchmarks/baseline-results.md`.
+- The pre-overhaul `mixed-large` aggregate and the older `best-of-two` / `selective-zpaq5` backend bake-offs are retained in git history; the shipping default is now level-driven `best-of-N`.
 
 ## Per-Type Highlights
 
-Against `7z-lzma2`, the current shipping native lane reports:
+Against `7z-lzma2`, the overhauled engine reports (best level shown):
 
-- Text and structured data: `-32.67%`
-- Raw bitmaps: `-23.84%`
-- JPEG: `-1.54%`
-- PNG: `-0.95%`
-- Video: `-0.94%`
-- Random data: `-0.01%`
-- Software binaries: near-tied at `+0.32%`
+- Text and structured data: `-40.7%`
+- JPEG: `-21.9%` (brunsli lossless transcode)
+- PNG: `-16.4%` (preflate deflate-undo, `--level max`)
+- Code: `-16.1%`
+- Software binaries: `-4.6%` (architecture-aware BCJ + ZPAQ-5)
+- Aggregate across the sweep: `-18.0%`
 
-## Latest Native Backend Experiments
+Full numbers, timings, and the level matrix live in
+`docs/benchmarks/baseline-results.md`.
 
-All rows below are native-only backend variants. They all produce readable `.dvz` files.
+## Backends
 
-| Dataset | Backend | End Size (MB) | Total Time (s) | Delta vs `best-of-two` |
-| --- | --- | ---: | ---: | ---: |
-| `large-text` | `best-of-two` | 175.432 | 516.8 | baseline |
-| `large-text` | `best-of-three-ppmd` | 175.432 | 556.8 | +3 bytes |
-| `large-text` | `selective-zpaq5` | 175.432 | 521.6 | +4 bytes |
-| `large-code` | `best-of-two` | 151.548 | 486.3 | baseline |
-| `large-code` | `best-of-three-ppmd` | 151.212 | 525.5 | -0.22% |
-| `large-code` | `selective-zpaq5` | 150.442 | 535.8 | -0.73% |
+The engine picks a backend per compression level (override with `--backend`):
 
-Current takeaway:
+| Backend | Codecs competed per solid group | Default at level |
+| --- | --- | --- |
+| `lzma2` | LZMA2 only | `fast` |
+| `best-of-n:lzma2,zpaq5` | LZMA2 vs ZPAQ-5 | `balanced` |
+| `best-of-n:lzma2,zpaq5,ppmd` | + PPMd | `max` |
+| `best-of-n:lzma2,zpaq5,ppmd,bsc` | + libbsc BWT | `insane` |
 
-- `best-of-three-ppmd` does not help the large text corpus in this pipeline, but it does help code-heavy data a little.
-- `selective-zpaq5` is the strongest measured code-heavy candidate so far. On `large-code`, it currently has the highest scouter reading.
-- `mixed-large` still needs a full rerun before the shipping default should change, so this is not the Super Saiyan switchover yet.
+Each `best-of-N` block is tagged with its winning codec, so a single archive can mix
+codecs and still extract with every decoder present. Codecs run concurrently and solid
+groups compress in parallel across cores.
 
 ## What Ships Today
 
@@ -111,13 +108,15 @@ Key traits:
 
 Current CLI backends:
 
-- `best-of-two` (default)
-- `best-of-three-ppmd`
-- `selective-zpaq5`
+- `best-of-n:<spec>` (e.g. `best-of-n:lzma2,zpaq5,ppmd,bsc`) — competes the listed codecs, keeps the smallest
+- `best-of-two` (legacy: LZMA2 vs ZPAQ-4)
+- `bsc` (libbsc BWT)
 - `lzma2`
 - `ppmd`
 - `libzpaq-4`
 - `libzpaq-5`
+
+When `--backend` is omitted the level picks the backend (see CLI Usage below).
 
 ### Windows desktop app
 
@@ -155,16 +154,29 @@ dotnet build apps/windows-ui/DevZip.App/DevZip.App.csproj
 
 ## CLI Usage
 
-Basic compression:
+Basic compression (defaults to the `balanced` level):
 
 ```powershell
 .\native\engine\build\devzip_cli.exe compress "path\to\folder" "archive.dvz"
 ```
 
-Select an experimental backend:
+Pick a compression level (`fast` | `balanced` | `max` | `insane`):
 
 ```powershell
-.\native\engine\build\devzip_cli.exe --backend selective-zpaq5 compress "path\to\folder" "archive.dvz"
+.\native\engine\build\devzip_cli.exe compress "path\to\folder" "archive.dvz" --level max
+```
+
+The level controls how hard the engine works:
+
+- `fast` — branch/delta filters only, single LZMA2 pass. Quickest.
+- `balanced` (default) — adds the brunsli JPEG transcoder, code dictionary, and PNG IDAT strip; routes through `best-of-N` (LZMA2 vs ZPAQ-5).
+- `max` — adds the preflate deflate-undo (PNG/zip/gzip) and escalates to `best-of-n` (LZMA2 vs ZPAQ-5 vs PPMd).
+- `insane` — `max` plus libbsc BWT in the best-of-N pool and full create-time roundtrip verification.
+
+Select a specific backend explicitly (overrides the level's default backend):
+
+```powershell
+.\native\engine\build\devzip_cli.exe --backend "best-of-n:lzma2,zpaq5,ppmd,bsc" compress "path\to\folder" "archive.dvz"
 ```
 
 Extract:

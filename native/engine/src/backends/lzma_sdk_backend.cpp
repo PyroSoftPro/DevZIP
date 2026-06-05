@@ -6,9 +6,12 @@ extern "C" {
 #include "Lzma2Enc.h"
 }
 
+#include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <memory>
 #include <new>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -38,6 +41,43 @@ UInt32 choose_dict_size(std::size_t input_size) {
   }
 
   return dict_size;
+}
+
+// LZMA's position-bits (pb) and literal-context (lc) parameters trade off
+// between text and binary content.  Text streams favour pb=0 (no positional
+// alignment) while machine code / structured binaries favour pb=2 (model the
+// 4-byte instruction/word alignment).  LZMA2 records lc/lp/pb inside the stream
+// itself, so adapting them here requires no format change and the decoder reads
+// them back automatically.  We sample a prefix to classify cheaply.
+struct LiteralModel {
+  unsigned lc = 3;
+  unsigned lp = 0;
+  unsigned pb = 0;
+};
+
+LiteralModel choose_literal_model(std::span<const std::byte> input) {
+  LiteralModel model;
+  if (input.empty()) {
+    return model;
+  }
+
+  const std::size_t sample = std::min<std::size_t>(input.size(), 256u * 1024u);
+  std::size_t text_bytes = 0;
+  for (std::size_t i = 0; i < sample; ++i) {
+    const auto value = std::to_integer<unsigned char>(input[i]);
+    const bool printable = (value >= 0x20 && value <= 0x7E) || value == 0x09 ||
+                           value == 0x0A || value == 0x0D;
+    if (printable) {
+      ++text_bytes;
+    }
+  }
+
+  const double text_ratio = static_cast<double>(text_bytes) / static_cast<double>(sample);
+  if (text_ratio < 0.85) {
+    // Binary / machine-code dominated: align the literal coder to 4-byte words.
+    model.pb = 2;
+  }
+  return model;
 }
 
 std::string lzma_error_message(SRes code, std::string_view context) {
@@ -120,6 +160,8 @@ class Lzma2Backend final : public CompressionBackend {
     };
     std::unique_ptr<CLzma2Enc, decltype(destroy)> guard(encoder, destroy);
 
+    const LiteralModel literal_model = choose_literal_model(request.input);
+
     CLzma2EncProps props;
     Lzma2EncProps_Init(&props);
     props.lzmaProps.level = 9;
@@ -128,7 +170,9 @@ class Lzma2Backend final : public CompressionBackend {
     props.lzmaProps.fb = 273;
     props.lzmaProps.btMode = 1;
     props.lzmaProps.mc = 10000;
-    props.lzmaProps.pb = 0;
+    props.lzmaProps.lc = static_cast<int>(literal_model.lc);
+    props.lzmaProps.lp = static_cast<int>(literal_model.lp);
+    props.lzmaProps.pb = static_cast<int>(literal_model.pb);
     props.lzmaProps.numHashBytes = 4;
     props.lzmaProps.numThreads = 1;
     props.lzmaProps.reduceSize = static_cast<UInt64>(request.input.size());
@@ -233,6 +277,12 @@ std::unique_ptr<CompressionBackend> make_backend(const BackendStamp& stamp) {
   }
   if (stamp.name == "best-of-three") {
     return make_best_of_three_backend();
+  }
+  if (stamp.name == "best-of-n") {
+    return make_best_of_n_backend(stamp.version);
+  }
+  if (stamp.name == "bsc") {
+    return make_bsc_backend();
   }
   if (stamp.name == "selective-zpaq") {
     return make_selective_zpaq_backend();

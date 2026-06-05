@@ -22,7 +22,20 @@ public sealed record CompressionProgress(
     string Headline,
     string Detail);
 
-public sealed record CompressionJobRequest(string SourcePath, string OutputPath);
+// Mirrors the native CLI's --level flag.  Higher levels enable more (and more
+// expensive) recompressors/backends for smaller output.
+public enum CompressionLevel
+{
+    Fast,
+    Balanced,
+    Max,
+    Insane
+}
+
+public sealed record CompressionJobRequest(
+    string SourcePath,
+    string OutputPath,
+    CompressionLevel Level = CompressionLevel.Balanced);
 
 public sealed record CompressionJobResult(bool Success, string OutputPath, string Message);
 
@@ -136,14 +149,16 @@ public sealed class CompressionJobRunner : ICompressionJobRunner
             Path.Combine(repoRoot, "native", "engine", "out", "devzip_cli.exe")
         };
 
+        var levelName = request.Level.ToString().ToLowerInvariant();
+
         var nativeCli = nativeCandidates.FirstOrDefault(File.Exists);
         if (!string.IsNullOrWhiteSpace(nativeCli))
         {
             return new CompressionCommand(
                 nativeCli,
-                $"compress \"{request.SourcePath}\" \"{request.OutputPath}\"",
+                $"compress \"{request.SourcePath}\" \"{request.OutputPath}\" --level {levelName}",
                 repoRoot,
-                "Using the native LZMA2 backend");
+                $"Using the native engine ({levelName} level)");
         }
 
         var allowReferenceCodec = string.Equals(

@@ -172,6 +172,18 @@ TransformKind checked_transform_kind(std::uint8_t raw) {
       return TransformKind::BcjX86;
     case static_cast<std::uint8_t>(TransformKind::DeltaFilter):
       return TransformKind::DeltaFilter;
+    case static_cast<std::uint8_t>(TransformKind::PngIdatStrip):
+      return TransformKind::PngIdatStrip;
+    case static_cast<std::uint8_t>(TransformKind::JpegBrunsli):
+      return TransformKind::JpegBrunsli;
+    case static_cast<std::uint8_t>(TransformKind::PreflateDeflate):
+      return TransformKind::PreflateDeflate;
+    case static_cast<std::uint8_t>(TransformKind::BcjArm64):
+      return TransformKind::BcjArm64;
+    case static_cast<std::uint8_t>(TransformKind::BcjArm):
+      return TransformKind::BcjArm;
+    case static_cast<std::uint8_t>(TransformKind::BcjArmThumb):
+      return TransformKind::BcjArmThumb;
     default:
       throw std::runtime_error("Manifest contains an unknown transform kind");
   }

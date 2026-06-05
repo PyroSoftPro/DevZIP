@@ -1,6 +1,7 @@
 #pragma once
 
 #include "devzip/archive_format.h"
+#include "devzip/compression_options.h"
 
 #include <span>
 #include <string>
@@ -45,6 +46,13 @@ std::vector<std::byte> reverse_code_dictionary(std::span<const std::byte> input,
 std::vector<std::byte> apply_bcj_x86(std::span<const std::byte> input);
 std::vector<std::byte> reverse_bcj_x86(std::span<const std::byte> input);
 
+std::vector<std::byte> apply_bcj_arm64(std::span<const std::byte> input);
+std::vector<std::byte> reverse_bcj_arm64(std::span<const std::byte> input);
+std::vector<std::byte> apply_bcj_arm(std::span<const std::byte> input);
+std::vector<std::byte> reverse_bcj_arm(std::span<const std::byte> input);
+std::vector<std::byte> apply_bcj_arm_thumb(std::span<const std::byte> input);
+std::vector<std::byte> reverse_bcj_arm_thumb(std::span<const std::byte> input);
+
 std::vector<std::byte> apply_delta_filter(std::span<const std::byte> input);
 std::vector<std::byte> reverse_delta_filter(std::span<const std::byte> input);
 
@@ -53,13 +61,39 @@ std::vector<std::byte> apply_png_idat_strip(std::span<const std::byte> input,
 std::vector<std::byte> reverse_png_idat_strip(std::span<const std::byte> raw_pixels,
                                               const std::string& recipe_str);
 
+// Lossless JPEG <-> brunsli transcoding.  apply returns an empty vector when the
+// input is not transcodable (and the caller must keep the original bytes).
+bool brunsli_available();
+std::vector<std::byte> apply_jpeg_brunsli(std::span<const std::byte> input);
+std::vector<std::byte> reverse_jpeg_brunsli(std::span<const std::byte> input,
+                                            std::size_t expected_size);
+
+// preflate-based PNG recompression: undo the IDAT deflate to raw filtered
+// pixel bytes (plus a reconstruction recipe), letting the backend model the
+// raw data and rebuilding the original PNG bit-exactly on restore.  apply
+// returns an empty vector when preflate is unavailable or the PNG is not
+// reconstructable.
+bool preflate_available();
+std::vector<std::byte> apply_png_preflate(std::span<const std::byte> input,
+                                          std::string& recipe_out);
+std::vector<std::byte> reverse_png_preflate(std::span<const std::byte> raw_pixels,
+                                            const std::string& recipe_str);
+
 }  // namespace transforms
 
 class TransformPipeline {
  public:
+  TransformPipeline() = default;
+  explicit TransformPipeline(CompressionOptions options) : options_(options) {}
+
   PreparedFile prepare_file(std::span<const std::byte> input, std::string_view archive_path) const;
   std::vector<std::byte> restore_file(const ManifestEntry& entry,
                                       const std::vector<DecodedBlock>& blocks) const;
+
+  const CompressionOptions& options() const { return options_; }
+
+ private:
+  CompressionOptions options_{};
 };
 
 }  // namespace devzip

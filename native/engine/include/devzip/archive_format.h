@@ -9,7 +9,7 @@
 
 namespace devzip {
 
-inline constexpr std::uint16_t kCurrentFormatVersion = 3;
+inline constexpr std::uint16_t kCurrentFormatVersion = 4;
 
 enum class EntryKind : std::uint8_t {
   File = 1,
@@ -24,6 +24,11 @@ enum class TransformKind : std::uint8_t {
   BcjX86 = 4,
   DeltaFilter = 5,
   PngIdatStrip = 6,
+  JpegBrunsli = 7,
+  PreflateDeflate = 8,
+  BcjArm64 = 9,
+  BcjArm = 10,
+  BcjArmThumb = 11,
 };
 
 enum class BlockStorageKind : std::uint8_t {
