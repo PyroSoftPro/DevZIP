@@ -21,6 +21,7 @@ add_library(devzip_engine STATIC
   src/backends/best_of_two_backend.cpp
   src/backends/best_of_n_backend.cpp
   src/backends/bsc_backend.cpp
+  src/backends/dzcm_backend.cpp
   src/backends/libzpaq_backend.cpp
   src/backends/lzma_sdk_backend.cpp
   src/backends/ppmd_backend.cpp

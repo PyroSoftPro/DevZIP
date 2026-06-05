@@ -46,6 +46,10 @@ std::unique_ptr<CompressionBackend> make_selective_zpaq_backend();
 std::unique_ptr<CompressionBackend> make_bsc_backend();
 bool bsc_backend_available();
 
+// DZCM: DevZIP's own context-mixing codec (binary arithmetic coder + multi-order
+// context models + match model + logistic mixer + SSE).  Always available.
+std::unique_ptr<CompressionBackend> make_dzcm_backend();
+
 // best-of-N: tries several codecs and keeps the smallest, tagging each block
 // with the winning codec.  The `spec` selects which codecs are attempted and is
 // round-tripped through the backend stamp version so parallel-group compression

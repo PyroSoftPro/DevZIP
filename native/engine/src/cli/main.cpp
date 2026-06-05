@@ -91,6 +91,9 @@ std::unique_ptr<devzip::CompressionBackend> make_backend_from_name(std::string_v
     }
     return bsc;
   }
+  if (name == "dzcm") {
+    return devzip::make_dzcm_backend();
+  }
   if (name == "best-of-n") {
     return devzip::make_best_of_n_backend("lzma2,zpaq5,ppmd,bsc");
   }

@@ -15,6 +15,7 @@ constexpr std::byte kTagLzma2{0x4C};  // 'L'
 constexpr std::byte kTagZpaq{0x5A};   // 'Z'
 constexpr std::byte kTagPpmd{0x50};   // 'P'
 constexpr std::byte kTagBsc{0x42};    // 'B'
+constexpr std::byte kTagDzcm{0x44};   // 'D'
 
 std::vector<std::string> split_spec(const std::string& spec) {
   std::vector<std::string> parts;
@@ -49,6 +50,9 @@ class BestOfNBackend final : public CompressionBackend {
       } else if (token == "bsc" && bsc_backend_available()) {
         use_bsc_ = true;
         any = true;
+      } else if (token == "dzcm") {
+        use_dzcm_ = true;
+        any = true;
       }
     }
     if (!any) {
@@ -65,6 +69,7 @@ class BestOfNBackend final : public CompressionBackend {
     std::future<CompressionResponse> zpaq_f;
     std::future<CompressionResponse> ppmd_f;
     std::future<CompressionResponse> bsc_f;
+    std::future<CompressionResponse> dzcm_f;
 
     if (use_lzma2_) {
       lzma2_f = std::async(std::launch::async, [&] { return make_lzma2_backend()->compress(request); });
@@ -78,6 +83,9 @@ class BestOfNBackend final : public CompressionBackend {
     }
     if (use_bsc_) {
       bsc_f = std::async(std::launch::async, [&] { return make_bsc_backend()->compress(request); });
+    }
+    if (use_dzcm_) {
+      dzcm_f = std::async(std::launch::async, [&] { return make_dzcm_backend()->compress(request); });
     }
 
     bool have_winner = false;
@@ -99,6 +107,7 @@ class BestOfNBackend final : public CompressionBackend {
     consider(zpaq_f, kTagZpaq);
     consider(ppmd_f, kTagPpmd);
     consider(bsc_f, kTagBsc);
+    consider(dzcm_f, kTagDzcm);
 
     if (!have_winner) {
       throw std::runtime_error("best-of-n: no codec produced output");
@@ -136,6 +145,9 @@ class BestOfNBackend final : public CompressionBackend {
       }
       return bsc->decompress(payload, expected_raw_size);
     }
+    if (tag == kTagDzcm) {
+      return make_dzcm_backend()->decompress(payload, expected_raw_size);
+    }
     throw std::runtime_error("best-of-n: unknown codec tag byte");
   }
 
@@ -145,6 +157,7 @@ class BestOfNBackend final : public CompressionBackend {
   bool use_zpaq_ = false;
   bool use_ppmd_ = false;
   bool use_bsc_ = false;
+  bool use_dzcm_ = false;
   std::string zpaq_method_ = "5";
 };
 

@@ -128,8 +128,10 @@ content-aware transforms: brunsli beats JPEG XL (`cjxl`) on JPEG (19.018 vs
 20.912 MB) and preflate beats `zopflipng` on PNG (17.550 vs 19.629 MB) while
 staying byte-exact. The paq8px `-8` ceiling (GPL, ~minutes/MB) on code is
 **0.109 MB**. Honest gap: on raw code/exe streams, **kanzi -l9 (Apache-2.0)
-edges DevZIP's current backend** — making a kanzi-class context-mixing codec the
-next `best-of-N` candidate. Full analysis: `docs/benchmarks/competitive-landscape.md`.
+edges DevZIP's current backend**. To close it we built **DZCM**, DevZIP's own
+clean-room context-mixing codec (see below) — it already beats LZMA2 by 30% on
+text — with a roadmap to match the strongest CM coders. Full analysis:
+`docs/benchmarks/competitive-landscape.md`.
 
 ## Backends
 
@@ -145,6 +147,26 @@ The engine picks a backend per compression level (override with `--backend`):
 Each `best-of-N` block is tagged with its winning codec, so a single archive can mix
 codecs and still extract with every decoder present. Codecs run concurrently and solid
 groups compress in parallel across cores.
+
+### DZCM — DevZIP's own context-mixing codec
+
+`dzcm` is a clean-room compressor written for DevZIP (no third-party codec): a
+32-bit binary arithmetic coder driven by a bank of finite-context models (orders
+0–8), a word model, sparse models, and a match model, blended by a
+context-selected logistic mixer and refined by two SSE/APM stages. It is fully
+deterministic and round-trips byte-exact. Backend-only results on the same
+pipeline (smaller is better):
+
+| Corpus | `lzma2` | `dzcm` | DZCM vs LZMA2 | `zpaq5` |
+| --- | ---: | ---: | ---: | ---: |
+| code | 216,684 | 201,014 | **−7.2%** | 169,879 |
+| text | 1,531,493 | 1,066,340 | **−30.4%** | 945,068 |
+
+DZCM already beats LZMA2 (and libbsc) on text and code and is available as
+`--backend dzcm` or as a `best-of-N` token (`best-of-n:lzma2,zpaq5,dzcm`), where
+it can only help since the smallest block wins. It does not yet beat the
+bit-history ICM in ZPAQ-5; the next step is adding nonstationary state-machine
+counters and an ISSE chain. Design notes: `docs/dzcm-codec.md`.
 
 ## What Ships Today
 
@@ -163,9 +185,10 @@ Key traits:
 
 Current CLI backends:
 
-- `best-of-n:<spec>` (e.g. `best-of-n:lzma2,zpaq5,ppmd,bsc`) — competes the listed codecs, keeps the smallest
+- `best-of-n:<spec>` (e.g. `best-of-n:lzma2,zpaq5,ppmd,bsc,dzcm`) — competes the listed codecs, keeps the smallest
 - `best-of-two` (legacy: LZMA2 vs ZPAQ-4)
 - `bsc` (libbsc BWT)
+- `dzcm` (DevZIP's own context-mixing codec)
 - `lzma2`
 - `ppmd`
 - `libzpaq-4`

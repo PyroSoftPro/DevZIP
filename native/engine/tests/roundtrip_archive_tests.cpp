@@ -148,6 +148,44 @@ DEVZIP_TEST(ppmd_backend_round_trips_a_directory_archive) {
                  "Extracted nested file should match");
 }
 
+DEVZIP_TEST(dzcm_backend_round_trips_text_and_binary) {
+  const auto root = make_temp_root("roundtrip-dzcm");
+  const auto source = root / "source";
+  const auto archive = root / "sample.dvz";
+  const auto extracted = root / "extracted";
+
+  std::filesystem::create_directories(source / "nested");
+  write_text(source / "a.txt", "alpha alpha alpha the quick brown fox jumps over the lazy dog");
+  write_text(source / "nested" / "b.txt", "beta beta beta beta beta beta beta beta beta");
+
+  // A blob spanning every byte value, repeated, to exercise the full coder and
+  // the match model.
+  std::vector<std::byte> blob;
+  blob.reserve(64 * 1024);
+  for (int repeat = 0; repeat < 256; ++repeat) {
+    for (int value = 0; value < 256; ++value) {
+      blob.push_back(static_cast<std::byte>((value * 7 + repeat) & 0xFF));
+    }
+  }
+  write_bytes(source / "blob.bin", blob);
+
+  auto backend = devzip::make_dzcm_backend();
+  devzip::create_archive(source, archive, *backend);
+  devzip::verify_archive(archive);
+  devzip::extract_archive(archive, extracted);
+
+  const auto manifest = devzip::read_archive_manifest(archive);
+  DEVZIP_REQUIRE(manifest.backend.name == "dzcm", "Archive should record the DZCM backend");
+  DEVZIP_REQUIRE(read_text(extracted / "a.txt") ==
+                     "alpha alpha alpha the quick brown fox jumps over the lazy dog",
+                 "DZCM extracted root file should match");
+  DEVZIP_REQUIRE(read_text(extracted / "nested" / "b.txt") ==
+                     "beta beta beta beta beta beta beta beta beta",
+                 "DZCM extracted nested file should match");
+  DEVZIP_REQUIRE(read_bytes(extracted / "blob.bin") == blob,
+                 "DZCM should reproduce a full-byte-range binary blob exactly");
+}
+
 DEVZIP_TEST(auto_backend_reads_legacy_libzpaq_archive) {
   const auto root = make_temp_root("roundtrip-libzpaq-auto");
   const auto source = root / "source";

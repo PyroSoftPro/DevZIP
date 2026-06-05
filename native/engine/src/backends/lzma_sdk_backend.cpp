@@ -284,6 +284,9 @@ std::unique_ptr<CompressionBackend> make_backend(const BackendStamp& stamp) {
   if (stamp.name == "bsc") {
     return make_bsc_backend();
   }
+  if (stamp.name == "dzcm") {
+    return make_dzcm_backend();
+  }
   if (stamp.name == "selective-zpaq") {
     return make_selective_zpaq_backend();
   }
