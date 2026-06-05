@@ -110,10 +110,24 @@ We benchmarked the overhauled engine against the strongest compressors available
 | zstd `--ultra -22` | 55.803 | +25.2% |
 | brotli `-11` | 57.365 | +28.7% |
 
+Per-corpus end size (MB). **Bold** = overall winner; _italic_ = a rival beats
+DevZIP. General-purpose codecs compress a solid TAR per corpus; `cjxl`/`zopflipng`
+run per file:
+
+| Corpus | 7z-lzma2 | zstd `-22` | brotli `-11` | kanzi `-l9` | per-type | DevZIP `max` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| text | 1.520 | 1.604 | 1.599 | 0.918 | — | **0.901** |
+| code | 0.193 | 0.199 | 0.192 | _0.151_ | — | 0.162 |
+| exe | 7.265 | 8.679 | 8.253 | _6.792_ | — | 6.930 |
+| jpeg | 24.337 | 24.323 | 25.579 | 23.661 | cjxl 20.912 | **19.018** |
+| png | 21.002 | 20.998 | 21.742 | 20.981 | zopflipng 19.629 | **17.550** |
+| **Aggregate** | 54.317 | 55.803 | 57.365 | 52.503 | — | **44.561** |
+
 DevZIP `max` produces the **smallest archive of any tool tested** — driven by
 content-aware transforms: brunsli beats JPEG XL (`cjxl`) on JPEG (19.018 vs
 20.912 MB) and preflate beats `zopflipng` on PNG (17.550 vs 19.629 MB) while
-staying byte-exact. Honest gap: on raw code/exe streams, **kanzi -l9 (Apache-2.0)
+staying byte-exact. The paq8px `-8` ceiling (GPL, ~minutes/MB) on code is
+**0.109 MB**. Honest gap: on raw code/exe streams, **kanzi -l9 (Apache-2.0)
 edges DevZIP's current backend** — making a kanzi-class context-mixing codec the
 next `best-of-N` candidate. Full analysis: `docs/benchmarks/competitive-landscape.md`.
 

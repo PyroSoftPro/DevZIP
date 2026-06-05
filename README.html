@@ -192,6 +192,22 @@
             </table>
           </div>
 
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Corpus</th><th>7z-lzma2</th><th>zstd -22</th><th>brotli -11</th><th>kanzi -l9</th><th>per-type</th><th>DevZIP max</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>text</td><td>1.520</td><td>1.604</td><td>1.599</td><td>0.918</td><td>—</td><td><strong>0.901</strong></td></tr>
+                <tr><td>code</td><td>0.193</td><td>0.199</td><td>0.192</td><td><em>0.151</em></td><td>—</td><td>0.162</td></tr>
+                <tr><td>exe</td><td>7.265</td><td>8.679</td><td>8.253</td><td><em>6.792</em></td><td>—</td><td>6.930</td></tr>
+                <tr><td>jpeg</td><td>24.337</td><td>24.323</td><td>25.579</td><td>23.661</td><td>cjxl 20.912</td><td><strong>19.018</strong></td></tr>
+                <tr><td>png</td><td>21.002</td><td>20.998</td><td>21.742</td><td>20.981</td><td>zopflipng 19.629</td><td><strong>17.550</strong></td></tr>
+                <tr class="highlight-row"><td><strong>Aggregate</strong></td><td>54.317</td><td>55.803</td><td>57.365</td><td>52.503</td><td>—</td><td><strong>44.561</strong></td></tr>
+              </tbody>
+            </table>
+          </div>
+
           <div class="notes-grid">
             <article class="note-card">
               <h3>Why DevZIP wins</h3>
