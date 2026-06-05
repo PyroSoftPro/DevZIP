@@ -96,6 +96,27 @@ Against `7z-lzma2`, the overhauled engine reports (best level shown):
 Full numbers, timings, and the level matrix live in
 `docs/benchmarks/baseline-results.md`.
 
+## Versus the Best-of-the-Best
+
+We benchmarked the overhauled engine against the strongest compressors available
+(same corpora, all roundtrip-verified). Aggregate end size across the sweep, MB
+(smaller is better):
+
+| Tool | Aggregate (MB) | vs DevZIP `max` |
+| --- | ---: | ---: |
+| **DevZIP `max`** | **44.561** | — |
+| kanzi `-l9` (context mixing) | 52.503 | +17.8% |
+| 7z-lzma2 | 54.317 | +21.9% |
+| zstd `--ultra -22` | 55.803 | +25.2% |
+| brotli `-11` | 57.365 | +28.7% |
+
+DevZIP `max` produces the **smallest archive of any tool tested** — driven by
+content-aware transforms: brunsli beats JPEG XL (`cjxl`) on JPEG (19.018 vs
+20.912 MB) and preflate beats `zopflipng` on PNG (17.550 vs 19.629 MB) while
+staying byte-exact. Honest gap: on raw code/exe streams, **kanzi -l9 (Apache-2.0)
+edges DevZIP's current backend** — making a kanzi-class context-mixing codec the
+next `best-of-N` candidate. Full analysis: `docs/benchmarks/competitive-landscape.md`.
+
 ## Backends
 
 The engine picks a backend per compression level (override with `--backend`):

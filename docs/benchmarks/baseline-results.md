@@ -49,6 +49,31 @@ the dominant costs. LZMA2 and ZPAQ run concurrently per solid group, and groups
 compress in parallel across cores, so wall-time scales with the slowest codec
 rather than their sum. Use `--level fast` when speed matters more than size.
 
+## Versus the Best-of-the-Best Rivals
+
+Same corpora, same machine, all roundtrip-verified. General-purpose codecs
+compress a solid TAR of each corpus; `cjxl`/`zopflipng` run per file. Sizes in MB.
+Full analysis and licensing live in `competitive-landscape.md`; reproduce with
+`benchmarks/tools/rival_sweep.ps1`.
+
+| Corpus | 7z-lzma2 | zstd `-22` | brotli `-11` | kanzi `-l9` | per-type | DevZIP best |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| text | 1.520 | 1.604 | 1.599 | 0.918 | — | **0.901** |
+| code | 0.193 | 0.199 | 0.192 | _0.151_ | — | 0.162 |
+| exe | 7.265 | 8.679 | 8.253 | _6.792_ | — | 6.930 |
+| jpeg | 24.337 | 24.323 | 25.579 | 23.661 | cjxl 20.912 | **19.018** |
+| png | 21.002 | 20.998 | 21.742 | 20.981 | zopflipng 19.629 | **17.550** |
+| **Aggregate** | 54.317 | 55.803 | 57.365 | 52.503 | — | **44.561** |
+
+- DevZIP `max` (44.561) has the smallest aggregate of any tool tested — **−15%**
+  vs the strongest general-purpose rival (kanzi -l9) and **−18%** vs 7z-lzma2.
+- The edge is from content-aware transforms: brunsli beats JPEG XL transcode on
+  JPEG (19.018 vs 20.912); preflate beats zopflipng on PNG (17.550 vs 19.629) while
+  staying byte-exact (zopflipng rewrites the file).
+- Honest gap: on raw streams **kanzi -l9 (Apache-2.0 context mixing) beats DevZIP's
+  current backend** on code (0.151) and exe (6.792). The paq8px -8 ceiling on code
+  is **0.109 MB**. Adding a kanzi-class CM codec to `best-of-N` is the next win.
+
 ## Levels
 
 | Level | Transforms | Backend pool | Use when |

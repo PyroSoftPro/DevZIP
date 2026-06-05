@@ -172,6 +172,40 @@
 
         <section class="content-section">
           <div class="section-heading">
+            <p class="eyebrow">Competitive analysis</p>
+            <h2>Versus the best-of-the-best</h2>
+            <p>Benchmarked against the strongest compressors available, same corpora, all roundtrip-verified. General-purpose codecs compress a solid TAR per corpus; <span class="code">cjxl</span>/<span class="code">zopflipng</span> run per file. Aggregate end size in MB — smaller is better.</p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Tool</th><th>Aggregate (MB)</th><th>vs DevZIP max</th></tr>
+              </thead>
+              <tbody>
+                <tr class="highlight-row"><td><strong>DevZIP max</strong></td><td><strong>44.561</strong></td><td>—</td></tr>
+                <tr><td>kanzi -l9 (context mixing)</td><td>52.503</td><td>+17.8%</td></tr>
+                <tr><td>7z-lzma2</td><td>54.317</td><td>+21.9%</td></tr>
+                <tr><td>zstd --ultra -22</td><td>55.803</td><td>+25.2%</td></tr>
+                <tr><td>brotli -11</td><td>57.365</td><td>+28.7%</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="notes-grid">
+            <article class="note-card">
+              <h3>Why DevZIP wins</h3>
+              <p>Content-aware transforms, not just a stronger coder: brunsli beats JPEG XL (<span class="code">cjxl</span>) on JPEG (19.018 vs 20.912 MB) and preflate beats <span class="code">zopflipng</span> on PNG (17.550 vs 19.629 MB) while staying byte-exact.</p>
+            </article>
+            <article class="note-card">
+              <h3>The honest gap</h3>
+              <p>On raw code/exe streams, <span class="code">kanzi -l9</span> (Apache-2.0 context mixing) edges DevZIP's current backend, and the <span class="code">paq8px</span> ceiling on code is 0.109 MB. A kanzi-class CM codec is the next <span class="code">best-of-N</span> candidate. See <span class="code">docs/benchmarks/competitive-landscape.md</span>.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
             <p class="eyebrow">Pre-overhaul reference</p>
             <h2>Other categories (older mixed corpus)</h2>
             <p>

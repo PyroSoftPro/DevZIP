@@ -29,6 +29,8 @@ TestResults/
 sample-data/
 benchmarks/manifests/*.results.json
 benchmarks/manifests/all-types-summary.json
+benchmarks/rivals/
+*.paq8px*
 
 native/engine/build/
 native/engine/out/
