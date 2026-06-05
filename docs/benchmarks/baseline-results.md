@@ -42,6 +42,7 @@ still **-17.5%** smaller in aggregate.
 | Executables | 6.7 | 91.1 | 89.6 |
 | JPEG | 1.8 | 33.4 | 89.1 |
 | PNG | 1.2 | 54.1 | 309.7 |
+| **Total** | **12.5** | **275.2** | **573.8** |
 
 DevZIP trades time for size: ZPAQ-5 context mixing and the preflate PNG path are
 the dominant costs. LZMA2 and ZPAQ run concurrently per solid group, and groups

@@ -59,8 +59,28 @@ Notes:
 
 - Lower end size is better; every DevZIP figure round-trips byte-exact.
 - Against the best 7-Zip method per category (lzma2 or ppmd), `devzip max` is still `-17.5%`.
-- DevZIP trades time for size (ZPAQ-5 + preflate). Full timings are in `docs/benchmarks/baseline-results.md`.
 - The pre-overhaul `mixed-large` aggregate and the older `best-of-two` / `selective-zpaq5` backend bake-offs are retained in git history; the shipping default is now level-driven `best-of-N`.
+
+## Time Cost (the tradeoff)
+
+DevZIP buys its smaller archives with CPU time: ZPAQ-5 context mixing and the
+preflate PNG path are the dominant costs. Codecs run concurrently per solid group
+and groups compress in parallel across cores, so wall-time tracks the slowest
+codec rather than the sum. Compression time, seconds, this machine (5900X):
+
+| Category | `7z-lzma2` | `devzip balanced` | `devzip max` |
+| --- | ---: | ---: | ---: |
+| Text | 2.7 | 94.5 | 83.0 |
+| Code | 0.1 | 2.1 | 2.1 |
+| Executables | 6.7 | 91.1 | 89.6 |
+| JPEG | 1.8 | 33.4 | 89.1 |
+| PNG | 1.2 | 54.1 | 309.7 |
+| **Total** | **12.5** | **275.2** | **573.8** |
+
+- DevZIP is roughly **20-45x** slower than 7z-lzma2 here in exchange for the
+  `-18%` size win; the gap is largest on PNG (`max`, preflate) and smallest on code.
+- Decompression is fast and symmetric across levels (no per-level penalty).
+- Use `--level fast` for a near-7-Zip-speed run when size matters less.
 
 ## Per-Type Highlights
 

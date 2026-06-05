@@ -1,0 +1,157 @@
+name: Build-Test-Upload
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: 0 6 * * 1 # Each Monday at 06:00 UTC
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: cmake:clang-10
+          mode: cmake
+          env: CC=/usr/bin/clang-10 CXX=/usr/bin/clang++-10
+          os: ubuntu-20.04
+
+        - name: cmake:clang-11
+          mode: cmake
+          env: CC=/usr/bin/clang-11 CXX=/usr/bin/clang++-11
+          os: ubuntu-20.04
+
+        - name: cmake:clang-12
+          mode: cmake
+          env: CC=/usr/bin/clang-12 CXX=/usr/bin/clang++-12
+          os: ubuntu-20.04
+
+        - name: cmake:clang-13
+          mode: cmake
+          env: CC=/usr/bin/clang-13 CXX=/usr/bin/clang++-13
+
+        - name: cmake:clang-14
+          mode: cmake
+          env: CC=/usr/bin/clang-14 CXX=/usr/bin/clang++-14
+
+        - name: cmake:clang-15
+          mode: cmake
+          env: CC=/usr/bin/clang-15 CXX=/usr/bin/clang++-15
+
+        - name: cmake:gcc-9
+          mode: cmake
+          env: CC=/usr/bin/gcc-9 CXX=/usr/bin/g++-9
+
+        - name: cmake:gcc-10
+          mode: cmake
+          env: CC=/usr/bin/gcc-10 CXX=/usr/bin/g++-10
+
+        - name: cmake:gcc-11
+          mode: cmake
+          env: CC=/usr/bin/gcc-11 CXX=/usr/bin/g++-11
+
+        - name: cmake:gcc-12
+          mode: cmake
+          env: CC=/usr/bin/gcc-12 CXX=/usr/bin/g++-12
+
+        - name: cmake:gcc-13
+          mode: cmake
+          env: CC=/usr/bin/gcc-13 CXX=/usr/bin/g++-13
+
+        - name: cmake:android:arm64-v8a
+          mode: cmake
+          cmake_params: -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" -DANDROID_ABI=arm64-v8a -DANDROID_NATIVE_API_LEVEL=25 -DBUILD_TESTING=off
+
+        - name: cmake:wasm
+          mode: cmake
+          wasm: true
+          # TODO(eustas): enable tests
+          cmake_params: -DCMAKE_TOOLCHAIN_FILE="$EMSDK/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake" -DBUILD_TESTING=off
+          env: emcmake
+
+        - name: cmake:win:default
+          mode: cmake
+          upload_artifacts: true
+          os: windows-latest
+
+        - name: cmake:osx:default
+          mode: cmake
+          os: macos-latest
+
+        - name: bazel:c
+          mode: bazel
+          bazel_project_root: .
+
+        - name: bazel:java
+          mode: bazel
+          bazel_project_root: java
+
+    env:
+      EM_VERSION: 3.1.51
+      NODE_VERSION: 21
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Install node
+      if: ${{ matrix.wasm }}
+      uses: actions/setup-node@b39b52d1213e96004bfcb1c61a8a6fa8ab84f3e8 # v4.0.1
+      with:
+        node-version: ${{env.NODE_VERSION}}
+
+    - name: Get non-EMSDK node path
+      if: ${{ matrix.wasm }}
+      run: which node >> $HOME/.base_node_path
+
+    - name: Install emsdk
+      if: ${{ matrix.wasm }}
+      uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
+      # TODO(eustas): We could cache this action but it doesn't work when running
+      # in a matrix.
+      with:
+        version: ${{env.EM_VERSION}}
+        no-cache: true
+
+    - name: Set EMSDK node version
+      if: ${{ matrix.wasm }}
+      run: |
+        echo "NODE_JS='$(cat $HOME/.base_node_path)'" >> $EMSDK/.emscripten
+        emsdk construct_env
+
+    - name: Configure @ CMake
+      if: ${{ matrix.mode == 'cmake' }}
+      run: ${{ matrix.env }} cmake -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_params }} -B out
+
+    - name: Build @ CMake
+      if: ${{ matrix.mode == 'cmake' }}
+      run: cmake --build out --config Release -j 2
+
+    - name: Test @ CMake
+      if: ${{ matrix.mode == 'cmake' }}
+      run: cd out && ctest -j 2
+
+    - name: Build @ Bazel
+      if: ${{ matrix.mode == 'bazel' }}
+      run: cd ${{ matrix.bazel_project_root }} && bazelisk build -c opt ...:all
+
+    - name: Test @ Bazel
+      if: ${{ matrix.mode == 'bazel' }}
+      run: cd ${{ matrix.bazel_project_root }} && bazelisk test -c opt ...:all
+
+    - name: upload
+      if: ${{ matrix.upload_artifacts }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}
+        path: out/artifacts
